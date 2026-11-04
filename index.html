@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>将棋 1v1</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+  <header><h1>将棋 1v1</h1></header>
+
+  <section id="lobby">
+    <div class="card">
+      <h2>オンライン対戦</h2>
+      <div class="row">
+        <label>あなたの手番
+          <select id="side-pref">
+            <option value="sente">先手</option>
+            <option value="gote">後手</option>
+            <option value="random">ランダム</option>
+          </select>
+        </label>
+        <button id="btn-host">部屋を作る</button>
+      </div>
+      <div id="invite" hidden>
+        <p>このリンクを友人に送ってください</p>
+        <div class="row">
+          <input id="invite-url" readonly>
+          <button id="btn-copy">コピー</button>
+        </div>
+        <p class="muted">部屋コード: <b id="room-code"></b></p>
+        <p class="muted" id="host-status">相手の参加を待っています…</p>
+      </div>
+      <hr>
+      <div class="row">
+        <input id="join-code" placeholder="部屋コードを入力" autocomplete="off">
+        <button id="btn-join">参加</button>
+      </div>
+      <p id="lobby-msg" class="muted"></p>
+    </div>
+
+    <div class="card">
+      <h2>ローカル対戦</h2>
+      <p class="muted">1台の端末で交互に指します</p>
+      <button id="btn-local">はじめる</button>
+    </div>
+  </section>
+
+  <section id="game" hidden>
+    <div id="status"></div>
+    <div class="layout">
+      <div class="play">
+        <div class="hand" id="hand-top"></div>
+        <div class="board-wrap">
+          <div class="files" id="files"></div>
+          <div class="board-row">
+            <div class="board" id="board"></div>
+            <div class="ranks" id="ranks"></div>
+          </div>
+        </div>
+        <div class="hand" id="hand-bottom"></div>
+      </div>
+      <div class="side">
+        <div class="controls">
+          <button id="btn-undo">待った</button>
+          <button id="btn-flip">盤を反転</button>
+          <button id="btn-resign">投了</button>
+          <button id="btn-rematch" hidden>再戦</button>
+          <button id="btn-lobby">ロビーへ</button>
+        </div>
+        <h3>棋譜</h3>
+        <ol id="kifu"></ol>
+      </div>
+    </div>
+  </section>
+
+  <div id="promo" class="modal" hidden>
+    <div class="modal-box">
+      <p>成りますか？</p>
+      <div class="row">
+        <button id="promo-yes">成る</button>
+        <button id="promo-no">成らない</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>
