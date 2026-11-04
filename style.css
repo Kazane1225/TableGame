@@ -39,6 +39,37 @@ input, select {
 .muted { color: #b8a98f; font-size: .9rem; }
 hr { border: none; border-top: 1px solid #4a3f33; margin: 16px 0; }
 
+button.primary { background: #e0a447; font-weight: bold; }
+button.big { width: 100%; padding: 12px; font-size: 1.05rem; margin-top: 12px; }
+a { color: #e8c07a; }
+.small { font-size: .85rem; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field input, .field select { width: 100%; }
+#join-code { flex: 1; min-width: 0; }
+
+.notice {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #5a3a2a;
+  border-left: 4px solid #e0a447;
+}
+.notice[hidden] { display: none; }
+.card.highlight { outline: 2px solid #e0a447; }
+
+.invite-banner {
+  max-width: 640px;
+  margin: 0 auto 12px;
+  padding: 12px 16px;
+  background: #4a3b2c;
+  border: 2px dashed #e0a447;
+  border-radius: 10px;
+}
+.invite-banner[hidden] { display: none; }
+.invite-banner p { margin: 0 0 8px; }
+#invite-url { flex: 1; min-width: 0; }
+
 #lobby {
   display: grid;
   gap: 16px;
@@ -46,6 +77,8 @@ hr { border: none; border-top: 1px solid #4a3f33; margin: 16px 0; }
   max-width: 560px;
   margin: 0 auto;
 }
+#lobby-normal { display: grid; gap: 16px; }
+#lobby-normal[hidden], .card[hidden] { display: none; }
 .card {
   background: #3a3129;
   border-radius: 10px;
@@ -203,6 +236,38 @@ hr { border: none; border-top: 1px solid #4a3f33; margin: 16px 0; }
   padding-bottom: 6px;
   font-size: .95rem;
 }
+
+.seat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  padding: 6px 10px;
+  background: #3a3129;
+  border-radius: 8px;
+}
+.seat .label { font-weight: bold; white-space: nowrap; }
+.seat .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.seat .name.empty { color: #b8a98f; }
+.seat.turn { outline: 2px solid #c8923f; }
+.seat button { padding: 4px 10px; font-size: .85rem; }
+
+#chat-log {
+  height: 180px;
+  overflow-y: auto;
+  background: #3a3129;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  font-size: .9rem;
+  word-break: break-word;
+}
+.chat-msg { margin: 2px 0; }
+.chat-msg .who { font-weight: bold; margin-right: 6px; }
+.chat-msg.me .who { color: #8fd0ff; }
+.chat-msg.opp .who { color: #ffb86b; }
+.chat-msg.system { color: #b8a98f; font-style: italic; }
+#chat-form input { flex: 1; min-width: 0; }
 
 .modal {
   position: fixed;
