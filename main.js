@@ -317,6 +317,12 @@ function commitMove(m) {
   if (mode === 'online') {
     selected = null;
     act({ type: 'move', move: clean });
+    if (!net.isHost) {
+      const ply = game.kifu.length;
+      setTimeout(() => {
+        if (mode === 'online' && game && game.kifu.length === ply && net.connected) net.send({ type: 'sync' });
+      }, 3000);
+    }
   } else {
     applyGameMove(clean);
   }
@@ -619,6 +625,8 @@ function clearDanmaku() {
 // 部屋を作った人（ホスト）が全員と接続し、盤と席の状態を管理して配信する
 
 const PEER_PREFIX = 'shogi-1v1-gh-';
+// ホストとゲストでやり取りの形式が変わったら上げる。違うバージョン同士は接続を断る
+const PROTOCOL = 3;
 const MAX_GUESTS = 16;
 const SEAT_HOLD_MS = 60000;          // 切断した参加者の席を確保しておく時間
 const RECONNECT_LIMIT_MS = 90000;    // ゲストがホストへの再接続を試み続ける時間
@@ -635,6 +643,7 @@ const net = {
   connected: false,
   conn: null,            // ゲスト → ホストの接続
   ver: -1,               // 盤面状態の版番号。ホストが配信のたびに増やす
+  epoch: null,           // ホストが部屋を立ち上げる（復元する）たびに変わる値。版番号の比較はこれが同じ間だけ
   heartbeat: null,
   reconnectTimer: null,
   reconnectStarted: 0,
@@ -654,6 +663,7 @@ const net = {
     const peer = this.peer;
     this.peer = this.conn = this.myId = this.heartbeat = this.reconnectTimer = null;
     this.ver = -1;
+    this.epoch = null;
     this.connected = false;
     this.isHost = false;
     this.stopped = false;
@@ -818,6 +828,7 @@ function startHostPeer(code, saved, deadline) {
       newGame();
       net.ver = 0;
     }
+    net.epoch = randomCode(8);
     // 途中で取りこぼしたゲストがいても、定期的な再配信で最新状態に追いつける
     net.heartbeat = setInterval(() => broadcast(stateMsg()), 4000);
     saveHost();
@@ -885,16 +896,28 @@ function onGuestData(c, msg) {
     onHello(c, g, msg);
     return;
   }
-  if (!g.memberId) return;
+  if (!g.memberId) {
+    // 参加者として登録されていない接続からの操作。ゲストに名乗り直してもらう
+    c.send({ type: 'rehello' });
+    return;
+  }
   if (msg.type === 'sync') {
     c.send(stateMsg());
     return;
   }
   handleAction(g.memberId, msg);
+  // 手が受け付けられなかった場合も、ゲストの盤面を正しい状態に戻させる
+  if (msg.type === 'move') c.send(stateMsg());
 }
 
 function onHello(c, g, msg) {
   if (g.memberId) return;
+  if (msg.proto !== PROTOCOL) {
+    c.send({ type: 'version-mismatch' });
+    setTimeout(() => c.close(), 500);
+    addChat({ system: true, text: `${cleanName(msg.name)}さんが別のバージョンのページから接続しようとしました。両方の端末でページを再読み込みしてください。` });
+    return;
+  }
   const name = cleanName(msg.name);
   const known = typeof msg.memberId === 'string' && msg.memberId !== net.myId
     && room.members.find(m => m.id === msg.memberId);
@@ -978,7 +1001,10 @@ function broadcast(msg) {
 }
 
 function stateMsg() {
-  return { type: 'state', ver: net.ver, game, seats: room.seats, members: room.members, rematch: room.rematch };
+  return {
+    type: 'state', epoch: net.epoch, ver: net.ver,
+    game, seats: room.seats, members: room.members, rematch: room.rematch,
+  };
 }
 
 function broadcastState() {
@@ -1127,7 +1153,7 @@ function connectToHost() {
     stopReconnect();
     const saved = readSaved(GUEST_SAVE_KEY);
     const memberId = saved && saved.room === net.roomCode ? saved.memberId : null;
-    c.send({ type: 'hello', name: guestName, memberId });
+    c.send({ type: 'hello', proto: PROTOCOL, name: guestName, memberId });
     if (mode === 'online') render();
   });
   c.on('data', msg => {
@@ -1168,12 +1194,31 @@ function stopReconnect() {
   net.reconnectTimer = null;
 }
 
+function versionMismatch() {
+  const text = 'ホストと違うバージョンのページを開いているため、参加できませんでした。両方の端末でページを再読み込み（スマホはタブを開き直す）してから、もう一度参加してください。';
+  if (mode === 'online') {
+    net.stopped = true;
+    addChat({ system: true, text });
+    render();
+  } else {
+    net.destroy();
+    setBusy(null);
+    lobbyMsg(text);
+  }
+}
+
 function onHostData(msg) {
   if (!msg || typeof msg !== 'object') return;
   switch (msg.type) {
     case 'welcome':
       net.myId = msg.memberId;
       sessionStorage.setItem(GUEST_SAVE_KEY, JSON.stringify({ room: net.roomCode, memberId: msg.memberId }));
+      break;
+    case 'rehello':
+      if (!net.stopped) net.send({ type: 'hello', proto: PROTOCOL, name: guestName, memberId: net.myId });
+      break;
+    case 'version-mismatch':
+      versionMismatch();
       break;
     case 'replaced':
       net.stopped = true;
@@ -1185,8 +1230,15 @@ function onHostData(msg) {
       addChat({ system: true, text: 'ホストが部屋を閉じました。' });
       break;
     case 'state': {
-      if (typeof msg.ver !== 'number' || msg.ver <= net.ver) return;
+      if (typeof msg.ver !== 'number') return;
+      if (msg.epoch === net.epoch && msg.ver <= net.ver) return;
+      net.epoch = msg.epoch;
       net.ver = msg.ver;
+      // 参加者IDを受け取れていない＝ホストが古いバージョンのページ
+      if (!net.myId) {
+        versionMismatch();
+        return;
+      }
       const changed = !game || game.kifu.length !== msg.game.kifu.length
         || room.seats.join() !== msg.seats.join();
       game = msg.game;
