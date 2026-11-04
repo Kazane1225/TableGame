@@ -269,6 +269,46 @@ a { color: #e8c07a; }
 .chat-msg.system { color: #b8a98f; font-style: italic; }
 #chat-form input { flex: 1; min-width: 0; }
 
+.play { position: relative; }
+#danmaku {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 5;
+}
+.danmaku-item {
+  position: absolute;
+  left: 0;
+  white-space: nowrap;
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 0 3px #000, 1px 1px 2px #000, -1px -1px 2px #000;
+  opacity: .92;
+  will-change: transform;
+}
+.danmaku-item.me { color: #bfe6ff; }
+
+@media (max-width: 760px) {
+  /* スマホではチャット欄が盤の下に隠れるので、入力欄だけ画面下に固定する */
+  #chat-form {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    margin: 0;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    background: rgba(43, 37, 32, .96);
+    border-top: 1px solid #4a3f33;
+    flex-wrap: nowrap;
+  }
+  /* iOS は 16px 未満の入力欄にフォーカスすると画面を拡大してしまう */
+  #chat-form input { font-size: 16px; }
+  body.online-mode { padding-bottom: 70px; }
+}
+
 .modal {
   position: fixed;
   inset: 0;

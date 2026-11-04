@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>将棋 1v1（観戦可）</title>
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=7">
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
@@ -79,6 +79,7 @@
           </div>
         </div>
         <div class="hand" id="hand-bottom"></div>
+        <div id="danmaku" aria-hidden="true"></div>
       </div>
       <div class="side">
         <div class="controls">
@@ -86,6 +87,7 @@
           <button id="btn-flip">盤を反転</button>
           <button id="btn-resign">投了</button>
           <button id="btn-rematch" hidden>再戦</button>
+          <button id="btn-danmaku" hidden>コメントを流す: ON</button>
           <button id="btn-lobby">ロビーへ</button>
         </div>
         <div id="room" hidden>
@@ -122,6 +124,6 @@
     </div>
   </div>
 
-  <script src="main.js?v=5"></script>
+  <script src="main.js?v=7"></script>
 </body>
 </html>

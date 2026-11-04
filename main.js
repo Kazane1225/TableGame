@@ -434,6 +434,9 @@ function render() {
   }
   $('chat').hidden = !online;
   $('chat-input').disabled = !net.connected;
+  document.body.classList.toggle('online-mode', online);
+  $('btn-danmaku').hidden = !online;
+  $('btn-danmaku').textContent = `コメントを流す: ${danmakuOn ? 'ON' : 'OFF'}`;
 }
 
 function renderHand(el, o, view) {
@@ -467,7 +470,7 @@ function renderStatus() {
     text = `${who(winner)}の勝ち（${reason}）`;
     if (online && mySeat() >= 0) text += winner === mySeat() ? ' — あなたの勝ちです！' : ' — あなたの負けです';
   } else if (online && !net.connected) {
-    text = 'ホストとの接続が切れました';
+    text = net.reconnectTimer ? 'ホストとの接続が切れました — 再接続しています…' : 'ホストとの接続が切れました';
   } else if (online && !bothSeated()) {
     text = mySeat() >= 0
       ? '対局相手を待っています'
@@ -484,6 +487,8 @@ function renderStatus() {
       text += '（王手！）';
       st.classList.add('check');
     }
+    const away = room.seats.filter(id => id && !memberOnline(id));
+    if (online && away.length) text += ` ／ ${away.map(memberName).join('、')}さんの再接続を待っています`;
   }
   st.textContent = text;
 }
@@ -510,7 +515,9 @@ function renderRoom() {
 
     const name = document.createElement('span');
     name.className = 'name' + (id ? '' : ' empty');
-    name.textContent = id ? memberName(id) + (id === net.myId ? '（あなた）' : '') : '空席';
+    name.textContent = id
+      ? memberName(id) + (id === net.myId ? '（あなた）' : '') + (memberOnline(id) ? '' : '（再接続待ち）')
+      : '空席';
     el.appendChild(name);
 
     if (id === net.myId) {
@@ -533,7 +540,7 @@ function renderRoom() {
 
   const watchers = room.members.filter(m => !room.seats.includes(m.id));
   $('spectators').textContent = watchers.length
-    ? '観戦: ' + watchers.map(m => m.name + (m.id === net.myId ? '（あなた）' : '')).join('、')
+    ? '観戦: ' + watchers.map(m => m.name + (m.id === net.myId ? '（あなた）' : '') + (m.online === false ? '（再接続待ち）' : '')).join('、')
     : '観戦者はいません';
 }
 
@@ -550,9 +557,62 @@ function addChat(entry) {
     who.textContent = entry.name;
     div.appendChild(who);
     div.appendChild(document.createTextNode(entry.text));
+    flowComment(entry);
   }
   log.appendChild(div);
   log.scrollTop = log.scrollHeight;
+}
+
+// ===== 盤の上に流れるコメント =====
+
+const DANMAKU_MS = 6000;
+// lanes[i]: { free: 次のコメントを右端から出せる時刻, end: 今のコメントが左端へ消える時刻 }
+const danmakuLanes = [];
+let danmakuOn = (localStorage.getItem('shogi-danmaku')
+  || (matchMedia('(max-width: 760px)').matches ? 'on' : 'off')) === 'on';
+
+function flowComment(entry) {
+  if (!danmakuOn || mode !== 'online') return;
+  const layer = $('danmaku');
+  const W = layer.clientWidth;
+  const H = layer.clientHeight;
+  if (!W || !H) return;
+
+  const el = document.createElement('div');
+  el.className = 'danmaku-item' + (entry.id === net.myId ? ' me' : '');
+  el.textContent = entry.text.length > 60 ? entry.text.slice(0, 60) + '…' : entry.text;
+  el.style.transform = `translateX(${W}px)`;
+  layer.appendChild(el);
+  const w = el.offsetWidth;
+  const h = el.offsetHeight + 4;
+
+  // 前のコメントに重ならず、追い付きもしない段を上から探す。空きがなければ一番早く空く段に出す
+  const now = performance.now();
+  const laneCount = Math.max(1, Math.floor(H / h));
+  const reachLeft = now + DANMAKU_MS * W / (W + w);
+  let lane = -1;
+  let earliest = 0;
+  for (let i = 0; i < laneCount; i++) {
+    const l = danmakuLanes[i] || { free: 0, end: 0 };
+    if (l.free <= now && l.end <= reachLeft) {
+      lane = i;
+      break;
+    }
+    if (i === 0 || l.free < (danmakuLanes[earliest]?.free ?? 0)) earliest = i;
+  }
+  if (lane < 0) lane = earliest;
+
+  danmakuLanes[lane] = { free: now + DANMAKU_MS * (w + 24) / (W + w), end: now + DANMAKU_MS };
+  el.style.top = `${lane * h + 2}px`;
+  el.animate(
+    [{ transform: `translateX(${W}px)` }, { transform: `translateX(${-w}px)` }],
+    { duration: DANMAKU_MS, easing: 'linear' },
+  ).onfinish = () => el.remove();
+}
+
+function clearDanmaku() {
+  $('danmaku').innerHTML = '';
+  danmakuLanes.length = 0;
 }
 
 // ===== 通信（PeerJS） =====
@@ -560,38 +620,76 @@ function addChat(entry) {
 
 const PEER_PREFIX = 'shogi-1v1-gh-';
 const MAX_GUESTS = 16;
+const SEAT_HOLD_MS = 60000;          // 切断した参加者の席を確保しておく時間
+const RECONNECT_LIMIT_MS = 90000;    // ゲストがホストへの再接続を試み続ける時間
+const HOST_RESTORE_MS = 45000;       // ホストがリロード後に同じ部屋コードの再取得を試み続ける時間
+const HOST_SAVE_MAX_AGE = 30 * 60 * 1000;
+const HOST_SAVE_KEY = 'shogi-host';
+const GUEST_SAVE_KEY = 'shogi-guest';
+
 const net = {
   peer: null,
-  myId: null,
+  myId: null,            // 参加者ID。ホストが発行し、同じタブならリロードしても変わらない
   roomCode: '',
   isHost: false,
   connected: false,
   conn: null,            // ゲスト → ホストの接続
   ver: -1,               // 盤面状態の版番号。ホストが配信のたびに増やす
   heartbeat: null,
-  guests: new Map(),     // ホスト側: peer id → { conn, name, joined }
+  reconnectTimer: null,
+  reconnectStarted: 0,
+  stopped: false,        // ゲスト: 部屋が閉じられた等で、もう再接続しない
+  guests: new Map(),     // ホスト側: 接続 → { memberId }
+  holds: new Map(),      // ホスト側: 切断中の参加者ID → 退室扱いにするタイマー
   send(msg) {
     if (this.conn && this.conn.open) this.conn.send(msg);
   },
-  destroy() {
+  // delay を指定すると、直前に送ったメッセージが届くのを待ってから切断する
+  destroy(delay = 0) {
     clearInterval(this.heartbeat);
-    this.heartbeat = null;
-    this.ver = -1;
-    if (this.peer) this.peer.destroy();
-    this.peer = this.conn = this.myId = null;
+    clearInterval(this.reconnectTimer);
+    for (const t of this.holds.values()) clearTimeout(t);
+    this.holds.clear();
     this.guests.clear();
+    const peer = this.peer;
+    this.peer = this.conn = this.myId = this.heartbeat = this.reconnectTimer = null;
+    this.ver = -1;
     this.connected = false;
     this.isHost = false;
+    this.stopped = false;
     this.roomCode = '';
+    if (peer) {
+      if (delay) setTimeout(() => peer.destroy(), delay);
+      else peer.destroy();
+    }
   },
 };
 
-function randomCode() {
+let guestName = 'ゲスト';
+
+function randomCode(len = 6) {
   const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
   let s = '';
-  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
   return s;
 }
+
+// sessionStorage はタブごとに分かれ、リロードしても残る
+function readSaved(key) {
+  try {
+    return JSON.parse(sessionStorage.getItem(key));
+  } catch {
+    return null;
+  }
+}
+
+function saveHost() {
+  sessionStorage.setItem(HOST_SAVE_KEY, JSON.stringify({
+    code: net.roomCode, memberId: net.myId, game, room, ver: net.ver, savedAt: Date.now(),
+  }));
+}
+
+const memberOnline = id => room.members.find(m => m.id === id)?.online !== false;
 
 function cleanName(v) {
   const s = typeof v === 'string' ? v.trim().slice(0, 16) : '';
@@ -663,44 +761,89 @@ function act(msg) {
 function hostRoom() {
   if (!requirePeerJs()) return;
   net.destroy();
-  const name = myName();
-  const code = randomCode();
+  sessionStorage.removeItem(GUEST_SAVE_KEY);
+  setBusy({ id: 'btn-host', text: '部屋を作成中…' });
+  lobbyMsg('');
+  startHostPeer(randomCode(), null, 0);
+}
+
+function restoreHost(saved) {
+  if (!requirePeerJs()) return;
+  setBusy({ id: 'btn-host', text: '部屋を復元中…' });
+  lobbyMsg('前回の部屋を復元しています…（数十秒かかることがあります）');
+  startHostPeer(saved.code, saved, Date.now() + HOST_RESTORE_MS);
+}
+
+function restoreFailed() {
+  net.destroy();
+  sessionStorage.removeItem(HOST_SAVE_KEY);
+  setBusy(null);
+  showLobby(null);
+  lobbyMsg('前回の部屋を復元できませんでした。お手数ですが部屋を作り直してください。');
+}
+
+function startHostPeer(code, saved, deadline) {
   const peer = new Peer(PEER_PREFIX + code);
   net.peer = peer;
   net.isHost = true;
-  setBusy({ id: 'btn-host', text: '部屋を作成中…' });
-  lobbyMsg('');
 
-  peer.on('open', id => {
-    net.myId = id;
+  peer.on('open', () => {
+    if (net.peer !== peer) return;
+    if (mode === 'online') return; // シグナリングへの再接続で open が再度来た場合
     net.roomCode = code;
     net.connected = true;
-    room = { seats: [null, null], members: [{ id, name }], rematch: [false, false] };
-    const pref = $('side-pref').value;
-    if (pref !== 'watch') {
-      const side = pref === 'sente' ? 0 : pref === 'gote' ? 1 : (Math.random() < 0.5 ? 0 : 1);
-      room.seats[side] = id;
+    if (saved) {
+      net.myId = saved.memberId;
+      net.ver = saved.ver;
+      game = saved.game;
+      room = saved.room;
+      undoStack = [];
+      selected = null;
+      for (const m of room.members) {
+        m.online = m.id === net.myId;
+        if (!m.online) holdMember(m.id);
+      }
+    } else {
+      net.myId = randomCode(12);
+      room = {
+        seats: [null, null],
+        members: [{ id: net.myId, name: myName(), online: true }],
+        rematch: [false, false],
+      };
+      const pref = $('side-pref').value;
+      if (pref !== 'watch') {
+        const side = pref === 'sente' ? 0 : pref === 'gote' ? 1 : (Math.random() < 0.5 ? 0 : 1);
+        room.seats[side] = net.myId;
+      }
+      newGame();
+      net.ver = 0;
     }
-    newGame();
-    net.ver = 0;
     // 途中で取りこぼしたゲストがいても、定期的な再配信で最新状態に追いつける
     net.heartbeat = setInterval(() => broadcast(stateMsg()), 4000);
+    saveHost();
     setBusy(null);
+    lobbyMsg('');
     enterGame('online');
-    addChat({ system: true, text: '部屋を作りました。招待リンクを友人に送ってください。' });
+    addChat({
+      system: true,
+      text: saved
+        ? '部屋を復元しました。参加者の再接続を待っています。'
+        : '部屋を作りました。招待リンクを友人に送ってください。',
+    });
   });
 
   peer.on('connection', c => {
     c.on('open', () => {
+      if (net.peer !== peer) return;
       if (net.guests.size >= MAX_GUESTS) {
         c.send({ type: 'full' });
         setTimeout(() => c.close(), 500);
         return;
       }
-      net.guests.set(c.peer, { conn: c, name: 'ゲスト', joined: false });
+      net.guests.set(c, { memberId: null });
     });
-    c.on('data', msg => handleAction(c.peer, msg));
-    c.on('close', () => onGuestLeave(c.peer));
+    c.on('data', msg => onGuestData(c, msg));
+    c.on('close', () => onGuestClose(c));
   });
 
   // シグナリングサーバーとの接続だけが切れた場合、既存の接続は生きているので再登録する
@@ -709,31 +852,128 @@ function hostRoom() {
   });
 
   peer.on('error', e => {
+    if (net.peer !== peer) return;
     if (e.type === 'unavailable-id') {
-      hostRoom();
+      peer.destroy();
+      if (!saved) {
+        startHostPeer(randomCode(), null, 0);
+      } else if (Date.now() < deadline) {
+        // リロード直後は、リロード前のページがまだ部屋コードを握っていることがあるので解放を待つ
+        setTimeout(() => {
+          if (net.peer === peer) startHostPeer(code, saved, deadline);
+        }, 3000);
+      } else {
+        restoreFailed();
+      }
       return;
     }
-    if (mode !== 'online') {
+    if (mode === 'online') return;
+    if (saved) {
+      restoreFailed();
+    } else {
+      net.destroy();
       setBusy(null);
       lobbyMsg('部屋を作れませんでした。時間をおいてもう一度お試しください。（' + e.type + '）');
     }
   });
 }
 
-function hostName(id) {
-  if (id === net.myId) return room.members[0].name;
-  return net.guests.get(id)?.name || 'ゲスト';
+function onGuestData(c, msg) {
+  const g = net.guests.get(c);
+  if (!g || !msg || typeof msg !== 'object') return;
+  if (msg.type === 'hello') {
+    onHello(c, g, msg);
+    return;
+  }
+  if (!g.memberId) return;
+  if (msg.type === 'sync') {
+    c.send(stateMsg());
+    return;
+  }
+  handleAction(g.memberId, msg);
 }
 
-function memberList() {
-  const list = [{ id: net.myId, name: hostName(net.myId) }];
-  for (const [id, g] of net.guests) if (g.joined) list.push({ id, name: g.name });
-  return list;
+function onHello(c, g, msg) {
+  if (g.memberId) return;
+  const name = cleanName(msg.name);
+  const known = typeof msg.memberId === 'string' && msg.memberId !== net.myId
+    && room.members.find(m => m.id === msg.memberId);
+
+  if (known) {
+    // リロード前の接続がまだ残っていたら、新しい接続を正として古い方を切る
+    for (const [other, og] of net.guests) {
+      if (other !== c && og.memberId === known.id) {
+        og.memberId = null;
+        other.send({ type: 'replaced' });
+        setTimeout(() => other.close(), 300);
+      }
+    }
+    clearHold(known.id);
+    const wasOffline = !known.online;
+    known.online = true;
+    known.name = name;
+    g.memberId = known.id;
+    c.send({ type: 'welcome', memberId: known.id });
+    if (wasOffline) systemChat(`${name}さんが戻りました`);
+  } else {
+    const id = randomCode(12);
+    room.members.push({ id, name, online: true });
+    g.memberId = id;
+    const empty = room.seats.indexOf(null);
+    if (empty >= 0) {
+      room.seats[empty] = id;
+      room.rematch = [false, false];
+    }
+    c.send({ type: 'welcome', memberId: id });
+    systemChat(`${name}さんが入室しました（${empty >= 0 ? SIDE_NAME[empty] + 'に着席' : '観戦'}）`);
+  }
+  broadcastState();
+}
+
+function onGuestClose(c) {
+  const g = net.guests.get(c);
+  net.guests.delete(c);
+  if (!g || !g.memberId) return;
+  const m = room.members.find(x => x.id === g.memberId);
+  if (!m) return;
+  m.online = false;
+  holdMember(m.id);
+  const seated = room.seats.includes(m.id);
+  systemChat(`${m.name}さんの接続が切れました${seated ? '（1分間は席を確保します）' : ''}`);
+  broadcastState();
+}
+
+function holdMember(id) {
+  clearHold(id);
+  net.holds.set(id, setTimeout(() => {
+    net.holds.delete(id);
+    const m = room.members.find(x => x.id === id);
+    if (m && !m.online) removeMember(id, `${m.name}さんが戻らなかったため退室扱いにしました`);
+  }, SEAT_HOLD_MS));
+}
+
+function clearHold(id) {
+  clearTimeout(net.holds.get(id));
+  net.holds.delete(id);
+}
+
+function removeMember(id, text) {
+  clearHold(id);
+  const i = room.members.findIndex(m => m.id === id);
+  if (i < 0) return;
+  room.members.splice(i, 1);
+  const seat = room.seats.indexOf(id);
+  if (seat >= 0) {
+    room.seats[seat] = null;
+    room.rematch = [false, false];
+  }
+  systemChat(text);
+  broadcastState();
 }
 
 function broadcast(msg) {
-  for (const g of net.guests.values()) {
-    if (g.joined && g.conn.open) g.conn.send(msg);
+  for (const [c, g] of net.guests) {
+    if (g.memberId && c.open) c.send(msg);
   }
 }
 
@@ -743,8 +983,8 @@ function stateMsg() {
 
 function broadcastState() {
   net.ver++;
-  room.members = memberList();
   broadcast(stateMsg());
+  saveHost();
   render();
 }
 
@@ -756,21 +996,16 @@ function systemChat(text) {
 
 function handleAction(id, msg) {
   if (!msg || typeof msg !== 'object') return;
-  const guest = net.guests.get(id);
-  if (id !== net.myId && !guest) return;
-  if (guest && !guest.joined && msg.type !== 'hello') return;
+  const me = room.members.find(m => m.id === id);
+  if (!me) return;
   const seat = room.seats.indexOf(id);
 
   switch (msg.type) {
-    case 'hello': {
-      if (!guest || guest.joined) return;
-      guest.name = cleanName(msg.name);
-      guest.joined = true;
-      const empty = room.seats.indexOf(null);
-      if (empty >= 0) room.seats[empty] = id;
-      systemChat(`${guest.name}さんが入室しました（${empty >= 0 ? SIDE_NAME[empty] + 'に着席' : '観戦'}）`);
-      break;
-    }
+    case 'leave':
+      if (id === net.myId) return;
+      for (const g of net.guests.values()) if (g.memberId === id) g.memberId = null;
+      removeMember(id, `${me.name}さんが退室しました`);
+      return;
     case 'move': {
       const ok = msg.move && !game.over && bothSeated() && room.seats[game.turn] === id
         && legalMoves(game, game.turn).some(x => sameMove(x, msg.move));
@@ -781,7 +1016,7 @@ function handleAction(id, msg) {
     case 'resign':
       if (seat < 0 || game.over) return;
       game.over = { winner: 1 - seat, reason: '投了' };
-      systemChat(`${hostName(id)}さんが投了しました`);
+      systemChat(`${me.name}さんが投了しました`);
       break;
     case 'rematch': {
       if (seat < 0 || !game.over || room.rematch[seat]) return;
@@ -792,7 +1027,7 @@ function handleAction(id, msg) {
         newGame();
         systemChat('先後を入れ替えて新しい対局を始めます');
       } else {
-        systemChat(`${hostName(id)}さんが再戦を申し込みました`);
+        systemChat(`${me.name}さんが再戦を申し込みました`);
       }
       break;
     }
@@ -802,21 +1037,18 @@ function handleAction(id, msg) {
       if (seat >= 0) room.seats[seat] = null;
       room.seats[s] = id;
       room.rematch = [false, false];
-      systemChat(`${hostName(id)}さんが${SIDE_NAME[s]}に着席しました`);
+      systemChat(`${me.name}さんが${SIDE_NAME[s]}に着席しました`);
       break;
     }
     case 'stand':
       if (seat < 0) return;
       room.seats[seat] = null;
       room.rematch = [false, false];
-      systemChat(`${hostName(id)}さんが席を立ちました`);
+      systemChat(`${me.name}さんが席を立ちました`);
       break;
-    case 'sync':
-      if (guest) guest.conn.send(stateMsg());
-      return;
     case 'chat': {
       if (typeof msg.text !== 'string' || !msg.text.trim()) return;
-      const entry = { id, name: hostName(id), text: msg.text.trim().slice(0, 200) };
+      const entry = { id, name: me.name, text: msg.text.trim().slice(0, 200) };
       broadcast({ type: 'chat', entry });
       addChat(entry);
       return;
@@ -824,20 +1056,6 @@ function handleAction(id, msg) {
     default:
       return;
   }
-  broadcastState();
-}
-
-function onGuestLeave(id) {
-  const g = net.guests.get(id);
-  if (!g) return;
-  net.guests.delete(id);
-  if (!g.joined) return;
-  const seat = room.seats.indexOf(id);
-  if (seat >= 0) {
-    room.seats[seat] = null;
-    room.rematch = [false, false];
-  }
-  systemChat(`${g.name}さんが退室しました`);
   broadcastState();
 }
 
@@ -852,40 +1070,37 @@ function joinRoom(input, btnId) {
     return;
   }
   net.destroy();
-  const name = myName();
+  sessionStorage.removeItem(HOST_SAVE_KEY);
+  guestName = myName();
   const peer = new Peer();
   net.peer = peer;
   net.roomCode = code;
+  // リロードしても同じ部屋に戻れるよう URL に部屋コードを残す
+  history.replaceState(null, '', `?room=${code}`);
   setBusy({ id: btnId, text: '接続中…' });
   lobbyMsg('');
 
-  peer.on('open', id => {
-    net.myId = id;
-    const c = peer.connect(PEER_PREFIX + code, { reliable: true, serialization: 'json' });
-    net.conn = c;
-    c.on('open', () => {
-      net.connected = true;
-      c.send({ type: 'hello', name });
-    });
+  let opened = false;
+  peer.on('open', () => {
+    if (net.peer !== peer || opened) return;
+    opened = true;
+    connectToHost();
     setTimeout(() => {
       if (net.peer !== peer || mode === 'online') return;
       net.destroy();
       setBusy(null);
       lobbyMsg('部屋に接続できませんでした。通信環境（モバイル回線や社内ネットワークなど）によってはつながらないことがあります。別の回線でもお試しください。');
     }, 15000);
-    c.on('data', onHostData);
-    c.on('close', () => {
-      if (net.conn !== c) return;
-      net.connected = false;
-      if (mode === 'online') {
-        addChat({ system: true, text: 'ホストとの接続が切れました（部屋が閉じられた可能性があります）' });
-        render();
-      }
-    });
+  });
+
+  peer.on('disconnected', () => {
+    if (net.peer === peer && !peer.destroyed) peer.reconnect();
   });
 
   peer.on('error', e => {
-    if (mode === 'online') return;
+    // 対局画面に入った後のエラーは再接続ループに任せる
+    if (net.peer !== peer || mode === 'online') return;
+    net.destroy();
     setBusy(null);
     lobbyMsg(e.type === 'peer-unavailable'
       ? '部屋が見つかりませんでした。部屋を作った人がページを閉じていないか確認し、閉じていた場合は部屋を作り直してもらってください。'
@@ -893,9 +1108,82 @@ function joinRoom(input, btnId) {
   });
 }
 
+function connectToHost() {
+  const peer = net.peer;
+  if (!peer || peer.destroyed) return;
+  if (peer.disconnected) {
+    peer.reconnect();
+    return;
+  }
+  const old = net.conn;
+  net.conn = null;
+  if (old) old.close();
+
+  const c = peer.connect(PEER_PREFIX + net.roomCode, { reliable: true, serialization: 'json' });
+  net.conn = c;
+  c.on('open', () => {
+    if (net.conn !== c) return;
+    net.connected = true;
+    stopReconnect();
+    const saved = readSaved(GUEST_SAVE_KEY);
+    const memberId = saved && saved.room === net.roomCode ? saved.memberId : null;
+    c.send({ type: 'hello', name: guestName, memberId });
+    if (mode === 'online') render();
+  });
+  c.on('data', msg => {
+    if (net.conn === c) onHostData(msg);
+  });
+  c.on('close', () => {
+    if (net.conn !== c) return;
+    net.conn = null;
+    net.connected = false;
+    if (mode !== 'online') return;
+    if (!net.stopped) startReconnect();
+    render();
+  });
+}
+
+function startReconnect() {
+  if (net.reconnectTimer) return;
+  net.reconnectStarted = Date.now();
+  addChat({ system: true, text: 'ホストとの接続が切れました。再接続を試みています…' });
+  net.reconnectTimer = setInterval(() => {
+    if (net.connected) {
+      stopReconnect();
+      return;
+    }
+    if (Date.now() - net.reconnectStarted > RECONNECT_LIMIT_MS) {
+      stopReconnect();
+      net.stopped = true;
+      addChat({ system: true, text: '再接続できませんでした。部屋が閉じられた可能性があります。' });
+      render();
+      return;
+    }
+    connectToHost();
+  }, 4000);
+}
+
+function stopReconnect() {
+  clearInterval(net.reconnectTimer);
+  net.reconnectTimer = null;
+}
+
 function onHostData(msg) {
   if (!msg || typeof msg !== 'object') return;
   switch (msg.type) {
+    case 'welcome':
+      net.myId = msg.memberId;
+      sessionStorage.setItem(GUEST_SAVE_KEY, JSON.stringify({ room: net.roomCode, memberId: msg.memberId }));
+      break;
+    case 'replaced':
+      net.stopped = true;
+      addChat({ system: true, text: '別のタブや端末から同じ参加者として接続されたため、この画面の接続を終了しました。' });
+      break;
+    case 'closed':
+      net.stopped = true;
+      sessionStorage.removeItem(GUEST_SAVE_KEY);
+      addChat({ system: true, text: 'ホストが部屋を閉じました。' });
+      break;
     case 'state': {
       if (typeof msg.ver !== 'number' || msg.ver <= net.ver) return;
       net.ver = msg.ver;
@@ -918,6 +1206,8 @@ function onHostData(msg) {
       addChat(msg.entry);
       break;
     case 'full':
+      if (mode === 'online') return;
+      net.destroy();
       setBusy(null);
       lobbyMsg('この部屋は満員のため参加できませんでした。');
       break;
@@ -939,14 +1229,23 @@ function backToLobby() {
       ? 'あなたは部屋のホストです。退出すると部屋が閉じ、全員の接続が切れます。退出しますか？'
       : (mySeat() >= 0 && !game.over ? '対局中です。退出しますか？' : null);
     if (warn && !confirm(warn)) return;
+    if (net.isHost) {
+      broadcast({ type: 'closed' });
+      sessionStorage.removeItem(HOST_SAVE_KEY);
+    } else {
+      net.send({ type: 'leave' });
+      sessionStorage.removeItem(GUEST_SAVE_KEY);
+    }
   }
-  net.destroy();
+  net.destroy(500);
   mode = null;
   game = null;
   room = { seats: [null, null], members: [], rematch: [false, false] };
   $('game').hidden = true;
   $('lobby').hidden = false;
   $('chat-log').innerHTML = '';
+  clearDanmaku();
+  document.body.classList.remove('online-mode');
   setBusy(null);
   showLobby(null);
 }
@@ -1014,6 +1313,12 @@ $('btn-rematch').onclick = () => {
   }
 };
 $('btn-lobby').onclick = backToLobby;
+$('btn-danmaku').onclick = () => {
+  danmakuOn = !danmakuOn;
+  localStorage.setItem('shogi-danmaku', danmakuOn ? 'on' : 'off');
+  if (!danmakuOn) clearDanmaku();
+  render();
+};
 
 $('chat-form').addEventListener('submit', e => {
   e.preventDefault();
@@ -1032,7 +1337,19 @@ document.addEventListener('visibilitychange', () => {
 });
 
 const roomParam = parseRoomCode(new URLSearchParams(location.search).get('room') || '');
-showLobby(roomParam || null);
+const hostSave = readSaved(HOST_SAVE_KEY);
+const guestSave = readSaved(GUEST_SAVE_KEY);
+if (hostSave && hostSave.code && hostSave.game && hostSave.room && Date.now() - hostSave.savedAt < HOST_SAVE_MAX_AGE) {
+  showLobby(null);
+  restoreHost(hostSave);
+} else {
+  sessionStorage.removeItem(HOST_SAVE_KEY);
+  showLobby(roomParam || null);
+  if (roomParam && guestSave && guestSave.room === roomParam) {
+    joinRoom(roomParam, 'btn-accept');
+    lobbyMsg('前回の部屋に再接続しています…');
+  }
+}
 $('player-name').addEventListener('keydown', e => {
   if (e.key === 'Enter' && roomParam && !$('btn-accept').disabled) $('btn-accept').click();
 });
