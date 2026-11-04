@@ -572,7 +572,7 @@ function addChat(entry) {
 // ===== 盤の上に流れるコメント =====
 
 const DANMAKU_MS = 6000;
-// lanes[i]: { free: 次のコメントを右端から出せる時刻, end: 今のコメントが左端へ消える時刻 }
+// lanes[i]: { free: 次のコメントを左端から出せる時刻, end: 今のコメントが右端へ消える時刻 }
 const danmakuLanes = [];
 let danmakuOn = (localStorage.getItem('shogi-danmaku')
   || (matchMedia('(max-width: 760px)').matches ? 'on' : 'off')) === 'on';
@@ -587,7 +587,7 @@ function flowComment(entry) {
   const el = document.createElement('div');
   el.className = 'danmaku-item' + (entry.id === net.myId ? ' me' : '');
   el.textContent = entry.text.length > 60 ? entry.text.slice(0, 60) + '…' : entry.text;
-  el.style.transform = `translateX(${W}px)`;
+  el.style.transform = 'translateX(-100%)';
   layer.appendChild(el);
   const w = el.offsetWidth;
   const h = el.offsetHeight + 4;
@@ -595,12 +595,12 @@ function flowComment(entry) {
   // 前のコメントに重ならず、追い付きもしない段を上から探す。空きがなければ一番早く空く段に出す
   const now = performance.now();
   const laneCount = Math.max(1, Math.floor(H / h));
-  const reachLeft = now + DANMAKU_MS * W / (W + w);
+  const reachEdge = now + DANMAKU_MS * W / (W + w);
   let lane = -1;
   let earliest = 0;
   for (let i = 0; i < laneCount; i++) {
     const l = danmakuLanes[i] || { free: 0, end: 0 };
-    if (l.free <= now && l.end <= reachLeft) {
+    if (l.free <= now && l.end <= reachEdge) {
       lane = i;
       break;
     }
@@ -611,7 +611,7 @@ function flowComment(entry) {
   danmakuLanes[lane] = { free: now + DANMAKU_MS * (w + 24) / (W + w), end: now + DANMAKU_MS };
   el.style.top = `${lane * h + 2}px`;
   el.animate(
-    [{ transform: `translateX(${W}px)` }, { transform: `translateX(${-w}px)` }],
+    [{ transform: `translateX(${-w}px)` }, { transform: `translateX(${W}px)` }],
     { duration: DANMAKU_MS, easing: 'linear' },
   ).onfinish = () => el.remove();
 }
