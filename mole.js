@@ -25,7 +25,6 @@ function createEngine(onChange) {
     scores: [0, 0],
     names: ['', ''],
     seated: [false, false],
-    cpu: false,
     rematch: [false, false],
     mole: null,       // { hole, stage: 'rumble'|'up', end, fake }
     lastHole: -1,
@@ -34,7 +33,6 @@ function createEngine(onChange) {
     phaseEnd: 0,
     moleReadyAt: 0,
     lockUntil: 0,
-    bot: { next: 0, target: null },
   };
 
   const emit = () => onChange();
@@ -69,10 +67,9 @@ function createEngine(onChange) {
     g.moleReadyAt = t + C.COOL_MS + extra;
   }
 
-  function seat(i, name, isCpu = false) {
+  function seat(i, name) {
     g.seated[i] = true;
     g.names[i] = name;
-    if (i === 1) g.cpu = isCpu;
     if (g.seated[0] && g.seated[1] && g.phase === 'waiting') startMatch();
     emit();
   }
@@ -80,7 +77,6 @@ function createEngine(onChange) {
   function unseat(i) {
     g.seated[i] = false;
     g.names[i] = '';
-    if (i === 1) g.cpu = false;
     resetToWaiting();
     emit();
   }
@@ -118,32 +114,6 @@ function createEngine(onChange) {
     }
   }
 
-  function runBot(t) {
-    if (!g.cpu || g.phase !== 'playing') return;
-    const bot = g.bot;
-    if (g.moleSeat === 1) {
-      if (g.mole || t < g.moleReadyAt || t < bot.next) return;
-      let hole;
-      do { hole = Math.floor(Math.random() * C.HOLES); } while (hole === g.lastHole);
-      handle(1, { type: 'pop', hole, fake: Math.random() < 0.25 });
-      bot.next = t + 300 + Math.random() * 600;
-      return;
-    }
-    const m = g.mole;
-    if (m && m.stage === 'up') {
-      if (!bot.target || bot.target.m !== m) {
-        bot.target = { m, at: t + 200 + Math.random() * 200 };
-      }
-      if (!bot.target.done && t >= bot.target.at) {
-        bot.target.done = true;
-        handle(1, { type: 'whack', hole: m.hole });
-      }
-    } else if (t >= bot.next) {
-      bot.next = t + 1200 + Math.random() * 1500;
-      if (Math.random() < 0.2) handle(1, { type: 'whack', hole: Math.floor(Math.random() * C.HOLES) });
-    }
-  }
-
   function tick() {
     const t = now();
     let changed = false;
@@ -153,7 +123,6 @@ function createEngine(onChange) {
       g.phaseEnd = t + C.ROUND_MS;
       g.moleReadyAt = t;
       g.lockUntil = 0;
-      g.bot = { next: t + 800, target: null };
       changed = true;
     }
 
@@ -181,14 +150,13 @@ function createEngine(onChange) {
           beginCountdown();
         } else {
           g.phase = 'over';
-          g.rematch = [false, g.cpu];
+          g.rematch = [false, false];
         }
         changed = true;
       }
     }
 
     if (changed) emit();
-    runBot(t);
   }
 
   function snap(forSeat = 0) {
@@ -204,7 +172,6 @@ function createEngine(onChange) {
       scores: g.scores.slice(),
       names: g.names.slice(),
       seated: g.seated.slice(),
-      cpu: g.cpu,
       rematch: g.rematch.slice(),
       mole: g.mole ? { hole: hideHole ? -1 : g.mole.hole, stage: g.mole.stage, ms: left(g.mole.end - t) } : null,
       lastHole: g.lastHole,
@@ -287,7 +254,7 @@ const MAX_NAME = 16;
 const JOIN_TIMEOUT_MS = 10000;
 
 const view = {
-  mode: null,       // 'host' | 'guest' | 'cpu'
+  mode: null,       // 'host' | 'guest'
   seat: 0,
   snap: null,
   t0: 0,
@@ -326,7 +293,7 @@ function lobbyMsg(text) {
   $('lobby-msg').hidden = !text;
 }
 
-const BUTTON_LABELS = { 'btn-host': '部屋を作る', 'btn-join': '参加', 'btn-accept': 'この部屋に参加する', 'btn-cpu': 'はじめる' };
+const BUTTON_LABELS = { 'btn-host': '部屋を作る', 'btn-join': '参加', 'btn-accept': 'この部屋に参加する' };
 
 function setBusy(busyText) {
   for (const [id, label] of Object.entries(BUTTON_LABELS)) {
@@ -381,7 +348,7 @@ function sendInput(msg) {
   }
 }
 
-// --- ホスト / CPU ---
+// --- ホスト ---
 
 function startEngine(name) {
   engine = createEngine(() => {
@@ -390,14 +357,6 @@ function startEngine(name) {
   });
   engine.seat(0, name);
   tickTimer = setInterval(() => engine.tick(), 40);
-}
-
-function startCpu() {
-  view.mode = 'cpu';
-  view.seat = 0;
-  startEngine(myName());
-  enterGame();
-  engine.seat(1, 'CPU', true);
 }
 
 function hostRoom() {
@@ -729,7 +688,6 @@ $('btn-sound').onclick = () => {
 };
 $('btn-lobby').onclick = backToLobby;
 $('btn-host').onclick = hostRoom;
-$('btn-cpu').onclick = startCpu;
 $('btn-join').onclick = () => joinRoom(parseRoomCode($('join-code').value));
 $('btn-accept').onclick = () => joinRoom(view.code);
 $('btn-invite-copy').onclick = async () => {
