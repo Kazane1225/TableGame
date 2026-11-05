@@ -141,6 +141,10 @@
 .hole .fx.show { animation: fx .5s ease-out; }
 
 .m-controls { justify-content: center; }
+
+.m-stage { position: relative; }
+#chat { margin-top: 16px; }
+#chat h3 { margin: 0 0 6px; font-size: .9rem; font-weight: 600; color: var(--text-dim); }
 #btn-fake.on { background: #e8604a; color: #fff; }
 #btn-fake[hidden], #btn-rematch[hidden] { display: none; }
 

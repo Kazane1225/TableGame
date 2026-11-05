@@ -479,11 +479,11 @@ function render() {
     rematchBtn.textContent = '再戦';
   }
   $('chat').hidden = !online;
-  $('chat-input').disabled = !net.connected;
+  chat.setEnabled(net.connected);
   document.body.classList.toggle('online-mode', online);
   $('btn-sound').textContent = `駒音: ${soundOn ? 'ON' : 'OFF'}`;
   $('btn-danmaku').hidden = !online;
-  $('btn-danmaku').textContent = `コメントを流す: ${danmakuOn ? 'ON' : 'OFF'}`;
+  $('btn-danmaku').textContent = `コメントを流す: ${chat.flowOn ? 'ON' : 'OFF'}`;
 }
 
 function renderHand(el, o, view) {
@@ -591,75 +591,13 @@ function renderRoom() {
     : '観戦者はいません';
 }
 
+const chat = createChat(text => {
+  if (!net.connected) return false;
+  act({ type: 'chat', text });
+});
+
 function addChat(entry) {
-  const log = $('chat-log');
-  const div = document.createElement('div');
-  if (entry.system) {
-    div.className = 'chat-msg system';
-    div.textContent = entry.text;
-  } else {
-    div.className = 'chat-msg ' + (entry.id === net.myId ? 'me' : 'opp');
-    const who = document.createElement('span');
-    who.className = 'who';
-    who.textContent = entry.name;
-    div.appendChild(who);
-    div.appendChild(document.createTextNode(entry.text));
-    flowComment(entry);
-  }
-  log.appendChild(div);
-  log.scrollTop = log.scrollHeight;
-}
-
-// ===== 盤の上に流れるコメント =====
-
-const DANMAKU_MS = 6000;
-// lanes[i]: { free: 次のコメントを左端から出せる時刻, end: 今のコメントが右端へ消える時刻 }
-const danmakuLanes = [];
-let danmakuOn = (localStorage.getItem('shogi-danmaku')
-  || (matchMedia('(max-width: 760px)').matches ? 'on' : 'off')) === 'on';
-
-function flowComment(entry) {
-  if (!danmakuOn || mode !== 'online') return;
-  const layer = $('danmaku');
-  const W = layer.clientWidth;
-  const H = layer.clientHeight;
-  if (!W || !H) return;
-
-  const el = document.createElement('div');
-  el.className = 'danmaku-item' + (entry.id === net.myId ? ' me' : '');
-  el.textContent = entry.text.length > 60 ? entry.text.slice(0, 60) + '…' : entry.text;
-  el.style.transform = 'translateX(-100%)';
-  layer.appendChild(el);
-  const w = el.offsetWidth;
-  const h = el.offsetHeight + 4;
-
-  // 前のコメントに重ならず、追い付きもしない段を上から探す。空きがなければ一番早く空く段に出す
-  const now = performance.now();
-  const laneCount = Math.max(1, Math.floor(H / h));
-  const reachEdge = now + DANMAKU_MS * W / (W + w);
-  let lane = -1;
-  let earliest = 0;
-  for (let i = 0; i < laneCount; i++) {
-    const l = danmakuLanes[i] || { free: 0, end: 0 };
-    if (l.free <= now && l.end <= reachEdge) {
-      lane = i;
-      break;
-    }
-    if (i === 0 || l.free < (danmakuLanes[earliest]?.free ?? 0)) earliest = i;
-  }
-  if (lane < 0) lane = earliest;
-
-  danmakuLanes[lane] = { free: now + DANMAKU_MS * (w + 24) / (W + w), end: now + DANMAKU_MS };
-  el.style.top = `${lane * h + 2}px`;
-  el.animate(
-    [{ transform: `translateX(${-w}px)` }, { transform: `translateX(${W}px)` }],
-    { duration: DANMAKU_MS, easing: 'linear' },
-  ).onfinish = () => el.remove();
-}
-
-function clearDanmaku() {
-  $('danmaku').innerHTML = '';
-  danmakuLanes.length = 0;
+  chat.add(entry.system ? entry : { name: entry.name, text: entry.text, mine: entry.id === net.myId });
 }
 
 // ===== 通信（PeerJS） =====
@@ -1348,8 +1286,7 @@ function backToLobby() {
   room = { seats: [null, null], members: [], rematch: [false, false] };
   $('game').hidden = true;
   $('lobby').hidden = false;
-  $('chat-log').innerHTML = '';
-  clearDanmaku();
+  chat.clear();
   document.body.classList.remove('online-mode');
   setBusy(null);
   showLobby(null);
@@ -1419,9 +1356,7 @@ $('btn-rematch').onclick = () => {
 };
 $('btn-lobby').onclick = backToLobby;
 $('btn-danmaku').onclick = () => {
-  danmakuOn = !danmakuOn;
-  localStorage.setItem('shogi-danmaku', danmakuOn ? 'on' : 'off');
-  if (!danmakuOn) clearDanmaku();
+  chat.toggleFlow();
   render();
 };
 
@@ -1431,15 +1366,6 @@ $('btn-sound').onclick = () => {
   if (soundOn) playMoveSound();
   render();
 };
-
-$('chat-form').addEventListener('submit', e => {
-  e.preventDefault();
-  const input = $('chat-input');
-  const text = input.value.trim();
-  if (!text || !net.connected) return;
-  act({ type: 'chat', text });
-  input.value = '';
-});
 
 // スマホでアプリを切り替えている間に届かなかった更新を、戻ってきた時点で取り直す
 document.addEventListener('visibilitychange', () => {

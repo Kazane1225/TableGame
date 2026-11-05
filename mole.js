@@ -323,6 +323,7 @@ function inviteUrl() {
 function enterGame() {
   $('lobby').hidden = true;
   $('mgame').hidden = false;
+  document.body.classList.add('online-mode');
   buildBoard();
   if (view.snap) render();
   requestAnimationFrame(frame);
@@ -340,6 +341,36 @@ function backToLobby() {
   if (view.mode === 'guest' && guestConn?.open) guestConn.send({ type: 'leave' });
   shutdown();
   location.href = location.pathname;
+}
+
+// --- チャット ---
+// ホストが発言を受け取って名前を付け、自分の画面とゲストの両方に出す
+
+const chat = createChat(text => {
+  if (view.mode === 'guest') {
+    if (view.closed || !guestConn?.open) return false;
+    guestConn.send({ type: 'chat', text });
+  } else {
+    hostChat(0, text);
+  }
+});
+
+function showChat(entry) {
+  if (!entry || typeof entry.text !== 'string') return;
+  chat.add(entry.system ? entry : { name: entry.name, text: entry.text, mine: entry.seat === view.seat });
+}
+
+function hostChat(seat, text) {
+  if (typeof text !== 'string' || !text.trim()) return;
+  const entry = { seat, name: engine.snap().names[seat] || 'ゲスト', text: text.trim().slice(0, 200) };
+  showChat(entry);
+  if (guestConn?.open) guestConn.send({ type: 'chat', entry });
+}
+
+function systemChat(text) {
+  const entry = { system: true, text };
+  showChat(entry);
+  if (guestConn?.open) guestConn.send({ type: 'chat', entry });
 }
 
 // --- 入力の送信 ---
@@ -400,6 +431,8 @@ function startHostPeer(code) {
     c.on('close', () => {
       if (c !== guestConn) return;
       guestConn = null;
+      const name = engine.snap().names[1];
+      if (name) systemChat(`${name}さんが退出しました`);
       engine.unseat(1);
     });
   });
@@ -425,9 +458,13 @@ function startHostPeer(code) {
 function onHostData(c, msg) {
   if (c !== guestConn || !msg || typeof msg !== 'object') return;
   if (msg.type === 'hello') {
-    engine.seat(1, cleanName(msg.name));
+    const name = cleanName(msg.name);
+    engine.seat(1, name);
+    systemChat(`${name}さんが入室しました`);
   } else if (msg.type === 'leave') {
     c.close();
+  } else if (msg.type === 'chat') {
+    if (guestConnSeated()) hostChat(1, msg.text);
   } else if (guestConnSeated()) {
     engine.handle(1, msg);
   }
@@ -494,6 +531,8 @@ function onGuestData(msg, fail) {
       enterGame();
     }
     onSnap(msg);
+  } else if (msg.type === 'chat') {
+    showChat(msg.entry);
   }
 }
 
@@ -599,6 +638,7 @@ function render() {
   $('btn-rematch').disabled = s.rematch[me];
   $('btn-rematch').textContent = s.rematch[me] ? '相手を待っています…' : '再戦';
   $('btn-sound').textContent = `音: ${soundOn ? 'ON' : 'OFF'}`;
+  $('btn-danmaku').textContent = `コメントを流す: ${chat.flowOn ? 'ON' : 'OFF'}`;
 
   renderStatus();
 }
@@ -607,6 +647,7 @@ function renderStatus() {
   const s = view.snap;
   const el = $('m-status');
   if (!s) return;
+  chat.setEnabled(!view.closed && !!guestConn?.open);
   if (view.closed) {
     el.innerHTML = '<span class="big">ホストとの接続が切れました</span>';
     return;
@@ -696,6 +737,10 @@ $('btn-sound').onclick = () => {
   soundOn = !soundOn;
   localStorage.setItem('mole-sound', soundOn ? 'on' : 'off');
   if (soundOn) sfx('beep');
+  if (view.snap) render();
+};
+$('btn-danmaku').onclick = () => {
+  chat.toggleFlow();
   if (view.snap) render();
 };
 $('btn-lobby').onclick = backToLobby;

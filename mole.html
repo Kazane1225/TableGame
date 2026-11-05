@@ -7,7 +7,7 @@
   <link rel="icon" href="assets/logo-dice.svg?v=2">
   <link rel="stylesheet" href="style.css?v=8">
   <link rel="stylesheet" href="theme.css?v=3">
-  <link rel="stylesheet" href="mole.css?v=4">
+  <link rel="stylesheet" href="mole.css?v=5">
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
@@ -72,16 +72,30 @@
     </div>
 
     <div id="m-status"></div>
-    <div id="m-board" class="m-board"></div>
+    <div class="m-stage">
+      <div id="m-board" class="m-board"></div>
+      <div id="danmaku" aria-hidden="true"></div>
+    </div>
 
     <div class="row m-controls">
       <button id="btn-fake">フェイント: OFF</button>
       <button id="btn-rematch" hidden>再戦</button>
       <button id="btn-sound">音: ON</button>
+      <button id="btn-danmaku">コメントを流す: ON</button>
       <button id="btn-lobby">ロビーへ</button>
+    </div>
+
+    <div id="chat">
+      <h3>チャット</h3>
+      <div id="chat-log"></div>
+      <form id="chat-form" class="row">
+        <input id="chat-input" maxlength="200" placeholder="メッセージ" autocomplete="off">
+        <button type="submit">送信</button>
+      </form>
     </div>
   </section>
 
-  <script src="mole.js?v=5"></script>
+  <script src="chat.js?v=1"></script>
+  <script src="mole.js?v=6"></script>
 </body>
 </html>
