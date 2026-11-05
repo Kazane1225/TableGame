@@ -8,8 +8,9 @@ const C = {
   ROUND_MS: 30000,
   COUNTDOWN_MS: 3000,
   RUMBLE_MS: 300,   // モグラが出る前の予兆（叩く側には場所が分からない）
-  UP_MIN_MS: 200,   // モグラが顔を出している時間（毎回この範囲でランダム）
-  UP_MAX_MS: 450,
+  UP_MIN_MS: 350,   // モグラが顔を出している時間（毎回この範囲でランダム）
+  UP_MAX_MS: 600,
+  GRACE_MS: 150,    // 引っ込んだ後も叩けば当たりにする時間。ゲストの通信の遅れを吸収する
   COOL_MS: 350,     // モグラ側が次に動けるまで
   STUN_MS: 300,     // 叩かれたあとの追加の待ち
   MISS_LOCK_MS: 800, // お手付きしたハンマーが使えない時間
@@ -26,7 +27,7 @@ function createEngine(onChange) {
     names: ['', ''],
     seated: [false, false],
     rematch: [false, false],
-    mole: null,       // { hole, stage: 'rumble'|'up', end, fake }
+    mole: null,       // { hole, stage: 'rumble'|'up'|'down', end, fake }
     lastHole: -1,
     fxId: 0,
     fx: null,
@@ -96,7 +97,7 @@ function createEngine(onChange) {
     } else if (msg.type === 'whack') {
       if (!playing || s === g.moleSeat || t < g.lockUntil || !validHole) return;
       const m = g.mole;
-      if (m && m.stage === 'up' && m.hole === hole) {
+      if (m && (m.stage === 'up' || m.stage === 'down') && m.hole === hole) {
         g.scores[s]++;
         addFx('hit', hole);
         endMole(t, C.STUN_MS);
@@ -136,6 +137,9 @@ function createEngine(onChange) {
             m.stage = 'up';
             m.end = t + C.UP_MIN_MS + Math.random() * (C.UP_MAX_MS - C.UP_MIN_MS);
           }
+        } else if (m.stage === 'up') {
+          m.stage = 'down';
+          m.end = t + C.GRACE_MS;
         } else {
           g.scores[g.moleSeat]++;
           addFx('escape', m.hole);
@@ -446,6 +450,11 @@ function joinRoom(code) {
   const fail = text => {
     if (peer !== p) return;
     shutdown();
+    if (view.mode === 'guest') {
+      view.closed = true;
+      renderStatus();
+      return;
+    }
     setBusy(null);
     lobbyMsg(text);
   };
@@ -538,7 +547,8 @@ function onSnap(s) {
   view.t0 = performance.now();
   if (view.lastFx < 0) view.lastFx = s.fx ? s.fx.id : 0;
 
-  if (s.mole && (!prev || !prev.mole || prev.mole.stage !== s.mole.stage || prev.mole.hole !== s.mole.hole)) {
+  if (s.mole && s.mole.stage !== 'down'
+    && (!prev || !prev.mole || prev.mole.stage !== s.mole.stage || prev.mole.hole !== s.mole.hole)) {
     sfx(s.mole.stage === 'rumble' ? 'rumble' : 'pop');
   }
   if (s.fx && s.fx.id !== view.lastFx) {
@@ -663,6 +673,8 @@ $('m-board').addEventListener('pointerdown', e => {
   audio();
   const hole = Number(h.dataset.i);
   if (role() === 'mole') {
+    // ホストに無視される操作でフェイントを消費しないよう、ここで弾く
+    if (s.mole || hole === s.lastHole || s.coolMs - (performance.now() - view.t0) > 0) return;
     sendInput({ type: 'pop', hole, fake: view.fake });
     if (view.fake) {
       view.fake = false;

@@ -667,7 +667,7 @@ function clearDanmaku() {
 
 const PEER_PREFIX = 'shogi-1v1-gh-';
 // ホストとゲストでやり取りの形式が変わったら上げる。違うバージョン同士は接続を断る
-const PROTOCOL = 3;
+const PROTOCOL = 4;
 const MAX_GUESTS = 16;
 const SEAT_HOLD_MS = 60000;          // 切断した参加者の席を確保しておく時間
 const RECONNECT_LIMIT_MS = 90000;    // ゲストがホストへの再接続を試み続ける時間
@@ -679,6 +679,7 @@ const GUEST_SAVE_KEY = 'shogi-guest';
 const net = {
   peer: null,
   myId: null,            // 参加者ID。ホストが発行し、同じタブならリロードしても変わらない
+  token: null,           // ゲスト: 再接続時の本人確認用。参加者IDは全員に配られるので、こちらは本人にしか渡さない
   roomCode: '',
   isHost: false,
   connected: false,
@@ -702,7 +703,7 @@ const net = {
     this.holds.clear();
     this.guests.clear();
     const peer = this.peer;
-    this.peer = this.conn = this.myId = this.heartbeat = this.reconnectTimer = null;
+    this.peer = this.conn = this.myId = this.token = this.heartbeat = this.reconnectTimer = null;
     this.ver = -1;
     this.epoch = null;
     this.connected = false;
@@ -848,6 +849,7 @@ function startHostPeer(code, saved, deadline) {
       net.ver = saved.ver;
       game = saved.game;
       room = saved.room;
+      room.tokens = room.tokens || {};
       undoStack = [];
       selected = null;
       for (const m of room.members) {
@@ -860,6 +862,7 @@ function startHostPeer(code, saved, deadline) {
         seats: [null, null],
         members: [{ id: net.myId, name: myName(), online: true }],
         rematch: [false, false],
+        tokens: {},
       };
       const pref = $('side-pref').value;
       if (pref !== 'watch') {
@@ -961,6 +964,7 @@ function onHello(c, g, msg) {
   }
   const name = cleanName(msg.name);
   const known = typeof msg.memberId === 'string' && msg.memberId !== net.myId
+    && typeof msg.token === 'string' && room.tokens[msg.memberId] === msg.token
     && room.members.find(m => m.id === msg.memberId);
 
   if (known) {
@@ -977,18 +981,20 @@ function onHello(c, g, msg) {
     known.online = true;
     known.name = name;
     g.memberId = known.id;
-    c.send({ type: 'welcome', memberId: known.id });
+    c.send({ type: 'welcome', memberId: known.id, token: msg.token });
     if (wasOffline) systemChat(`${name}さんが戻りました`);
   } else {
     const id = randomCode(12);
+    const token = randomCode(24);
     room.members.push({ id, name, online: true });
+    room.tokens[id] = token;
     g.memberId = id;
     const empty = room.seats.indexOf(null);
     if (empty >= 0) {
       room.seats[empty] = id;
       room.rematch = [false, false];
     }
-    c.send({ type: 'welcome', memberId: id });
+    c.send({ type: 'welcome', memberId: id, token });
     systemChat(`${name}さんが入室しました（${empty >= 0 ? SIDE_NAME[empty] + 'に着席' : '観戦'}）`);
   }
   broadcastState();
@@ -1026,6 +1032,7 @@ function removeMember(id, text) {
   const i = room.members.findIndex(m => m.id === id);
   if (i < 0) return;
   room.members.splice(i, 1);
+  delete room.tokens[id];
   const seat = room.seats.indexOf(id);
   if (seat >= 0) {
     room.seats[seat] = null;
@@ -1193,8 +1200,11 @@ function connectToHost() {
     net.connected = true;
     stopReconnect();
     const saved = readSaved(GUEST_SAVE_KEY);
-    const memberId = saved && saved.room === net.roomCode ? saved.memberId : null;
-    c.send({ type: 'hello', proto: PROTOCOL, name: guestName, memberId });
+    const mine = saved && saved.room === net.roomCode;
+    c.send({
+      type: 'hello', proto: PROTOCOL, name: guestName,
+      memberId: mine ? saved.memberId : null, token: mine ? saved.token : null,
+    });
     if (mode === 'online') render();
   });
   c.on('data', msg => {
@@ -1253,10 +1263,11 @@ function onHostData(msg) {
   switch (msg.type) {
     case 'welcome':
       net.myId = msg.memberId;
-      sessionStorage.setItem(GUEST_SAVE_KEY, JSON.stringify({ room: net.roomCode, memberId: msg.memberId }));
+      net.token = msg.token;
+      sessionStorage.setItem(GUEST_SAVE_KEY, JSON.stringify({ room: net.roomCode, memberId: msg.memberId, token: msg.token }));
       break;
     case 'rehello':
-      if (!net.stopped) net.send({ type: 'hello', proto: PROTOCOL, name: guestName, memberId: net.myId });
+      if (!net.stopped) net.send({ type: 'hello', proto: PROTOCOL, name: guestName, memberId: net.myId, token: net.token });
       break;
     case 'version-mismatch':
       versionMismatch();
