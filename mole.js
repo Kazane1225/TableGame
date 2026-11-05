@@ -534,11 +534,11 @@ function onGuestData(msg, fail) {
 const role = () => (view.snap && view.snap.moleSeat === view.seat ? 'mole' : 'hammer');
 
 const ICON_SRC = {
-  mole: 'assets/mole.svg',
-  hammer: 'assets/hammer.svg',
-  hit: 'assets/fx-hit.svg',
-  miss: 'assets/fx-miss.svg',
-  escape: 'assets/fx-escape.svg',
+  mole: 'assets/mole.svg?v=2',
+  hammer: 'assets/hammer.svg?v=2',
+  hit: 'assets/fx-hit.svg?v=2',
+  miss: 'assets/fx-miss.svg?v=2',
+  escape: 'assets/fx-escape.svg?v=2',
 };
 
 function iconEl(name, cls = 'ico') {

@@ -1,22 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <defs>
-    <linearGradient id="face" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#d9d2c6"/>
-    </linearGradient>
-    <radialGradient id="pip" cx="35%" cy="30%" r="80%">
-      <stop offset="0" stop-color="#e8505a"/>
-      <stop offset="1" stop-color="#a3141f"/>
-    </radialGradient>
-  </defs>
-  <g transform="rotate(-10 64 64)">
-    <rect x="18" y="22" width="92" height="92" rx="20" fill="#8b6a3a" opacity=".45" transform="translate(4 6)"/>
-    <rect x="18" y="18" width="92" height="92" rx="20" fill="url(#face)" stroke="#b9ad98" stroke-width="3"/>
-    <rect x="24" y="23" width="80" height="16" rx="8" fill="#fff" opacity=".6"/>
-    <circle cx="42" cy="42" r="8.5" fill="url(#pip)"/>
-    <circle cx="86" cy="42" r="8.5" fill="url(#pip)"/>
-    <circle cx="64" cy="64" r="8.5" fill="url(#pip)"/>
-    <circle cx="42" cy="86" r="8.5" fill="url(#pip)"/>
-    <circle cx="86" cy="86" r="8.5" fill="url(#pip)"/>
+  <g stroke="#3b2614" stroke-width="5" stroke-linejoin="round">
+    <path transform="rotate(14 64 70)" d="M70 14 L99 28 Q103 70 110 112 L30 112 Q37 70 41 28 Z" fill="#c98f45"/>
+    <path transform="rotate(-7 64 70)" d="M60 12 L91 27 Q95 70 102 116 L18 116 Q25 70 29 27 Z" fill="#f2d29a"/>
   </g>
+  <text transform="rotate(-7 64 70)" x="60" y="94" text-anchor="middle" font-family="Yu Mincho, YuMincho, Hiragino Mincho ProN, serif" font-weight="700" font-size="50" fill="#3b2614">卓</text>
 </svg>
