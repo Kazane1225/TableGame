@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>モグラたたき 1v1</title>
+  <title>モグラたたき | テーブルゲーム</title>
   <link rel="icon" href="assets/logo-dice.svg">
   <link rel="stylesheet" href="style.css?v=8">
-  <link rel="stylesheet" href="theme.css?v=2">
-  <link rel="stylesheet" href="mole.css?v=3">
+  <link rel="stylesheet" href="theme.css?v=3">
+  <link rel="stylesheet" href="mole.css?v=4">
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
-  <header class="topbar"><a class="home" href="index.html"><img class="ico" src="assets/logo-dice.svg" alt="">テーブルゲーム</a><h1><img class="ico" src="assets/hammer.svg" alt="">モグラたたき 1v1</h1></header>
+  <header class="topbar"><a class="home" href="index.html"><img class="ico" src="assets/logo-dice.svg" alt="">テーブルゲーム</a><h1>モグラたたき</h1></header>
 
   <section id="lobby">
     <div class="card">
@@ -30,36 +30,33 @@
     </div>
 
     <div id="lobby-normal">
-      <div class="card">
-        <h2>遊び方</h2>
-        <p class="muted">モグラ側と叩く側に分かれて対戦します。1ラウンド30秒で、2ラウンド目は役割が入れ替わります。</p>
-        <ul class="muted rules">
-          <li><b>モグラ側</b>: 穴をタップすると、盤が少し揺れてからモグラが顔を出します（叩く側にはどの穴か分かりません）。叩かれずに引っ込めば +1点。<b>フェイント</b>を使うと揺れるだけでモグラは出ません。直前に出した穴は続けて使えません。</li>
-          <li><b>叩く側</b>: 顔を出したモグラの穴をタップして叩くと +1点。<b>お手付き</b>（モグラのいない穴を叩く）をすると、モグラ側に +0.5点が入り、少しの間ハンマーが使えません。</li>
-        </ul>
-      </div>
-
-      <div class="card">
-        <h2>友人を招待して遊ぶ</h2>
-        <p class="muted">部屋を作ると招待リンクが発行されます。それを友人に送ってください。</p>
+      <div class="card lobby-main">
+        <h2>対戦をはじめる</h2>
+        <p class="muted">部屋を作ると招待リンクが出ます。相手に送ってください。</p>
         <button id="btn-host" class="primary big">部屋を作る</button>
       </div>
 
-      <div class="card">
-        <h2>招待された部屋に入る</h2>
-        <div class="row">
-          <input id="join-code" placeholder="招待リンク または 部屋コード" autocomplete="off">
-          <button id="btn-join">参加</button>
+      <div class="lobby-sub">
+        <div>
+          <h3>リンクをもらった人</h3>
+          <div class="row">
+            <input id="join-code" placeholder="招待リンクか部屋コード" autocomplete="off">
+            <button id="btn-join">参加</button>
+          </div>
+        </div>
+        <div>
+          <h3>ひとりで練習</h3>
+          <button id="btn-cpu">CPUと対戦</button>
+        </div>
+        <div>
+          <h3>ルール</h3>
+          <p class="muted">30秒ずつ2ラウンド。2ラウンド目で役割を交代します。</p>
+          <ul class="muted rules">
+            <li><b>モグラ役</b>: 穴をタップすると、少し揺れてからモグラが出ます。叩かれずに引っ込めば1点。<b>フェイント</b>中は揺れるだけで出ません。同じ穴は続けて使えません。</li>
+            <li><b>叩く役</b>: 出てきたモグラを叩けば1点。空振りするとモグラ役に0.5点入り、少しの間叩けなくなります。</li>
+          </ul>
         </div>
       </div>
-
-      <div class="card">
-        <h2>CPUと遊ぶ</h2>
-        <p class="muted">1人で練習できます。通信はしません。</p>
-        <button id="btn-cpu">はじめる</button>
-      </div>
-
-      <p class="muted small"><a href="index.html">← テーブルゲームに戻る</a></p>
     </div>
   </section>
 

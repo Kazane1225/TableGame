@@ -6,8 +6,8 @@
   <title>テーブルゲーム</title>
   <link rel="icon" href="assets/logo-dice.svg">
   <link rel="stylesheet" href="style.css?v=8">
-  <link rel="stylesheet" href="theme.css?v=2">
-  <link rel="stylesheet" href="hub.css?v=2">
+  <link rel="stylesheet" href="theme.css?v=3">
+  <link rel="stylesheet" href="hub.css?v=3">
   <script>
     // 以前の将棋の招待リンク（index.html?room=...）は将棋のページへ回す
     if (new URLSearchParams(location.search).has('room')) {
@@ -17,48 +17,36 @@
 </head>
 <body>
   <main class="hub">
-    <div class="hub-hero">
-      <img class="logo" src="assets/logo-dice.svg" alt="">
-      <h1>テーブルゲーム</h1>
-      <p>友だちを招待して、ブラウザですぐ遊べます</p>
-    </div>
+    <header class="hub-head">
+      <h1><img class="logo" src="assets/logo-dice.svg" alt="">テーブルゲーム</h1>
+      <p>リンクを送れば、友だちとすぐ遊べます。</p>
+    </header>
 
-    <div class="game-grid">
+    <div class="game-list">
       <a class="game-card" href="shogi.html">
-        <div class="game-art art-shogi"><span><i class="shogi-piece">王</i></span></div>
+        <div class="game-art art-shogi" aria-hidden="true">
+          <i class="shogi-piece opp">飛</i>
+          <i class="shogi-piece">王</i>
+          <i class="shogi-piece">金</i>
+        </div>
         <div class="game-body">
-          <h2>将棋 1v1</h2>
-          <p>招待リンクで友人と対局。観戦、チャット、待ったにも対応した本格的な将棋です。</p>
-          <div class="tags">
-            <span class="tag">2人対戦</span>
-            <span class="tag">観戦可</span>
-            <span class="tag">1台で交代</span>
-          </div>
-          <div class="play-btn">遊ぶ</div>
+          <h2>将棋</h2>
+          <p>招待リンクで1対1。観戦とチャットもできます。待ったあり。</p>
+          <span class="meta">2人 ・ 1台で交代もOK</span>
         </div>
       </a>
 
       <a class="game-card" href="mole.html">
-        <div class="game-art art-mole"><span><img src="assets/mole.svg" alt=""></span></div>
+        <div class="game-art art-mole" aria-hidden="true"><img src="assets/mole.svg" alt=""></div>
         <div class="game-body">
-          <h2>モグラたたき 1v1</h2>
-          <p>モグラ側と叩く側に分かれて対戦するリアルタイムゲーム。フェイントとお手付きの駆け引きが熱い。</p>
-          <div class="tags">
-            <span class="tag">2人対戦</span>
-            <span class="tag">リアルタイム</span>
-            <span class="tag">CPU戦</span>
-          </div>
-          <div class="play-btn">遊ぶ</div>
+          <h2>モグラたたき</h2>
+          <p>モグラ役と叩く役に分かれて対戦。フェイントで相手を釣るのがコツ。</p>
+          <span class="meta">2人 ・ CPUとも遊べます</span>
         </div>
       </a>
-
-      <div class="game-card soon">
-        <div class="plus">＋</div>
-        <p>新しいゲームを<br>順次追加予定</p>
-      </div>
     </div>
 
-    <p class="hub-foot">オンライン対戦は招待リンクを送るだけ。アカウント登録は不要です。</p>
+    <p class="hub-foot">登録なしで遊べます。</p>
   </main>
 </body>
 </html>

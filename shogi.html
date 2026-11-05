@@ -3,18 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>将棋 1v1（観戦可）</title>
+  <title>将棋 | テーブルゲーム</title>
   <link rel="icon" href="assets/logo-dice.svg">
   <link rel="stylesheet" href="style.css?v=8">
-  <link rel="stylesheet" href="theme.css?v=2">
+  <link rel="stylesheet" href="theme.css?v=3">
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
-  <header class="topbar"><a class="home" href="index.html"><img class="ico" src="assets/logo-dice.svg" alt="">テーブルゲーム</a><h1>将棋 1v1</h1></header>
+  <header class="topbar"><a class="home" href="index.html"><img class="ico" src="assets/logo-dice.svg" alt="">テーブルゲーム</a><h1>将棋</h1></header>
 
   <section id="lobby">
     <div class="card">
-      <label class="field">あなたの名前（オンライン対戦で表示されます）
+      <label class="field">名前
         <input id="player-name" maxlength="16" autocomplete="off">
       </label>
     </div>
@@ -29,33 +29,33 @@
     </div>
 
     <div id="lobby-normal">
-      <div class="card">
-        <h2>友人を招待して遊ぶ</h2>
-        <p class="muted">部屋を作ると招待リンクが発行されるので、それを友人に送るだけです。あなたが部屋コードを入力する必要はありません。</p>
+      <div class="card lobby-main">
+        <h2>対局をはじめる</h2>
+        <p class="muted">部屋を作ると招待リンクが出ます。相手に送ってください。</p>
         <label class="field">あなたの席
           <select id="side-pref">
             <option value="sente">先手</option>
             <option value="gote">後手</option>
             <option value="random">ランダム</option>
-            <option value="watch">観戦（対局は他の人に任せる）</option>
+            <option value="watch">観戦だけ</option>
           </select>
         </label>
         <button id="btn-host" class="primary big">部屋を作る</button>
       </div>
 
-      <div class="card">
-        <h2>招待された部屋に入る</h2>
-        <p class="muted">友人から届いた招待リンクを開けば、そのまま参加できます。リンクか部屋コードを貼り付けて参加することもできます。</p>
-        <div class="row">
-          <input id="join-code" placeholder="招待リンク または 部屋コード" autocomplete="off">
-          <button id="btn-join">参加</button>
+      <div class="lobby-sub">
+        <div>
+          <h3>リンクをもらった人</h3>
+          <div class="row">
+            <input id="join-code" placeholder="招待リンクか部屋コード" autocomplete="off">
+            <button id="btn-join">参加</button>
+          </div>
         </div>
-      </div>
-
-      <div class="card">
-        <h2>1台で遊ぶ</h2>
-        <p class="muted">同じ端末を交代で操作して対局します。通信はしません。</p>
-        <button id="btn-local">はじめる</button>
+        <div>
+          <h3>1台で指す</h3>
+          <p class="muted">同じ端末を交代で操作します。</p>
+          <button id="btn-local">はじめる</button>
+        </div>
       </div>
     </div>
   </section>

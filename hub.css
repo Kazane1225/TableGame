@@ -1,153 +1,112 @@
 .hub {
-  max-width: 880px;
+  max-width: 760px;
   margin: 0 auto;
-  padding: 40px 16px 56px;
+  padding: 48px 20px 56px;
 }
 
-.hub-hero {
-  text-align: center;
-  margin-bottom: 36px;
+.hub-head { margin-bottom: 28px; }
+.hub-head h1 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 4px;
+  font-family: var(--mincho);
+  font-size: clamp(1.7rem, 5vw, 2.2rem);
+  font-weight: 700;
 }
-.hub-hero .logo {
-  width: 84px;
-  height: 84px;
-  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .5));
-}
-.hub-hero h1 {
-  margin: 10px 0 6px;
-  font-size: clamp(1.8rem, 6vw, 2.6rem);
-  letter-spacing: .18em;
-  background: linear-gradient(180deg, #ffe3a0, #d4922f);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.hub-hero p {
-  margin: 0;
-  color: var(--text-dim);
-  letter-spacing: .06em;
-}
+.hub-head .logo { width: 40px; height: 40px; }
+.hub-head p { margin: 0; color: var(--text-dim); }
 
-.game-grid {
+.game-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
 }
 
 .game-card {
-  position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 18px;
+  border-radius: 8px;
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, var(--panel-1), var(--panel-2));
-  box-shadow: var(--shadow);
+  background: var(--surface);
   color: inherit;
   text-decoration: none;
-  transition: transform .18s, box-shadow .18s, border-color .18s;
+  transition: border-color .15s;
 }
-.game-card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(243, 195, 100, .5);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, .5);
-}
-.game-card:focus-visible { outline: 2px solid var(--gold-1); outline-offset: 3px; }
+.game-card:hover { border-color: var(--accent); }
+.game-card:hover h2 { color: var(--accent); }
+.game-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 .game-art {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  height: 140px;
-  font-size: 4.2rem;
+  height: 132px;
+  overflow: hidden;
 }
-.game-art span { display: flex; filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .45)); transition: transform .25s; }
-.game-art span img { width: 108px; height: 108px; margin-bottom: -22px; }
-.game-card:hover .game-art span { transform: scale(1.12) rotate(-4deg); }
+
+/* 盤の一部を切り取ったような絵 */
+.art-shogi {
+  gap: 10px;
+  padding-bottom: 14px;
+  background:
+    linear-gradient(rgba(88, 56, 18, .55) 1px, transparent 1px) 0 0 / 100% 33px,
+    linear-gradient(90deg, rgba(88, 56, 18, .55) 1px, transparent 1px) 0 0 / 30px 100%,
+    #e3b866;
+}
 .shogi-piece {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 84px;
-  height: 94px;
-  padding-top: 14px;
-  background: linear-gradient(160deg, #fbe7bd, #e3b872);
+  width: 52px;
+  height: 58px;
+  padding-top: 9px;
+  background: linear-gradient(#f7deae, #e9c486);
   clip-path: polygon(50% 0, 84% 14%, 100% 100%, 0 100%, 16% 14%);
   color: #1d1408;
-  font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+  font-family: var(--mincho);
   font-style: normal;
-  font-size: 2.8rem;
+  font-size: 1.7rem;
   font-weight: bold;
+  filter: drop-shadow(1px 2px 1px rgba(0, 0, 0, .35));
 }
-.art-shogi {
-  background:
-    repeating-linear-gradient(92deg, rgba(110, 64, 16, .1) 0 2px, transparent 2px 9px),
-    linear-gradient(135deg, #e9c27a, #c99443);
-}
+.shogi-piece.opp { transform: rotate(180deg) translateY(36px); }
+
 .art-mole {
   background:
-    radial-gradient(ellipse 60% 40% at 50% 100%, #6b4a26 0 60%, transparent 61%),
-    linear-gradient(180deg, #5d8d44, #3f6a2e);
+    radial-gradient(ellipse 46% 26% at 50% 100%, #1a120a 0 70%, transparent 71%),
+    #4f7f3a;
 }
+.art-mole img { width: 96px; height: 96px; margin-bottom: -14px; }
 
 .game-body {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 8px;
-  padding: 16px 18px 18px;
+  gap: 4px;
+  padding: 14px 16px 16px;
 }
 .game-body h2 {
   margin: 0;
+  font-family: var(--mincho);
   font-size: 1.25rem;
-  letter-spacing: .08em;
-  color: var(--gold-1);
+  transition: color .15s;
 }
 .game-body p {
   flex: 1;
   margin: 0;
   color: var(--text-dim);
   font-size: .92rem;
-  line-height: 1.6;
 }
-.tags { display: flex; flex-wrap: wrap; gap: 6px; }
-.tag {
-  padding: 2px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, .07);
-  border: 1px solid var(--line);
-  font-size: .75rem;
-  color: var(--text);
-}
-.play-btn {
+.meta {
   margin-top: 6px;
-  padding: 10px;
-  border-radius: 10px;
-  text-align: center;
-  font-weight: 700;
-  letter-spacing: .12em;
-  color: #231606;
-  background: linear-gradient(180deg, var(--gold-1), var(--gold-2));
-  box-shadow: 0 2px 0 var(--gold-edge);
+  font-size: .8rem;
+  color: #85775f;
 }
-
-.game-card.soon {
-  align-items: center;
-  justify-content: center;
-  min-height: 280px;
-  background: transparent;
-  border: 2px dashed rgba(255, 255, 255, .14);
-  box-shadow: none;
-  color: var(--text-dim);
-  text-align: center;
-  cursor: default;
-}
-.game-card.soon:hover { transform: none; box-shadow: none; border-color: rgba(255, 255, 255, .14); }
-.game-card.soon .plus { font-size: 2.4rem; opacity: .6; }
 
 .hub-foot {
-  margin-top: 40px;
-  text-align: center;
+  margin-top: 32px;
   font-size: .8rem;
   color: #85775f;
 }

@@ -17,12 +17,11 @@
   min-width: 0;
   padding: 8px 12px;
   text-align: center;
-  background: linear-gradient(180deg, var(--panel-1), var(--panel-2));
+  background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 14px;
-  box-shadow: var(--shadow);
+  border-radius: 8px;
 }
-.m-player.me { border-color: var(--gold-2); box-shadow: 0 0 0 2px rgba(212, 146, 47, .35), var(--shadow); }
+.m-player.me { border-color: var(--accent); }
 .m-player .m-name {
   display: block;
   overflow: hidden;
@@ -39,9 +38,8 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, #5a4733, #2a211a);
-  border: 3px solid var(--gold-2);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, .45), inset 0 2px 6px rgba(255, 255, 255, .08);
+  background: var(--surface-2);
+  border: 2px solid var(--line-strong);
   font-size: 1.5rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -64,12 +62,10 @@
   max-width: 100%;
   margin: 8px auto 16px;
   padding: 14px;
-  border-radius: 20px;
-  border: 5px solid #5a3d1a;
-  background:
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, .03) 0 3px, transparent 3px 8px),
-    linear-gradient(180deg, #5f9246, #3d6b2d);
-  box-shadow: inset 0 4px 14px rgba(0, 0, 0, .4), 0 10px 26px rgba(0, 0, 0, .5);
+  border-radius: 12px;
+  border: 4px solid #5a3d1a;
+  background: #4f7f3a;
+  box-shadow: inset 0 3px 10px rgba(0, 0, 0, .35);
   transition: filter .1s;
 }
 .m-board.rumble-all .hole { animation: shake .09s linear infinite; }
@@ -140,7 +136,7 @@
 .hole .fx.show { animation: fx .5s ease-out; }
 
 #m-status .role { white-space: nowrap; }
-#m-status .big.win { color: var(--gold-1); text-shadow: 0 0 12px rgba(243, 195, 100, .55); }
+#m-status .big.win { color: var(--accent); }
 .m-player .m-name .ico { width: 1.5em; height: 1.5em; }
 .hole .fx.show { animation: fx .5s ease-out; }
 
