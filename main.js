@@ -236,7 +236,47 @@ function newGame() {
   selected = null;
 }
 
+// ===== 駒音 =====
+
+let soundOn = localStorage.getItem('shogi-sound') !== 'off';
+let audioCtx = null;
+
+function playMoveSound() {
+  if (!soundOn) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const t = audioCtx.currentTime;
+    // 木の盤を打つ「パチッ」: 短いノイズ＋低めの減衰トーン
+    const len = Math.floor(audioCtx.sampleRate * 0.06);
+    const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buf;
+    const bp = audioCtx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1800;
+    const ng = audioCtx.createGain();
+    ng.gain.value = 0.9;
+    noise.connect(bp).connect(ng).connect(audioCtx.destination);
+    noise.start(t);
+
+    const osc = audioCtx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(420, t);
+    osc.frequency.exponentialRampToValueAtTime(140, t + 0.09);
+    const og = audioCtx.createGain();
+    og.gain.setValueAtTime(0.6, t);
+    og.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    osc.connect(og).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.13);
+  } catch { /* 音が出せなくても対局は続ける */ }
+}
+
 function applyGameMove(m) {
+  playMoveSound();
   const o = game.turn;
   undoStack.push(JSON.stringify(game));
   game.kifu.push(formatMove(game, m, o, game.last));
@@ -441,6 +481,7 @@ function render() {
   $('chat').hidden = !online;
   $('chat-input').disabled = !net.connected;
   document.body.classList.toggle('online-mode', online);
+  $('btn-sound').textContent = `駒音: ${soundOn ? 'ON' : 'OFF'}`;
   $('btn-danmaku').hidden = !online;
   $('btn-danmaku').textContent = `コメントを流す: ${danmakuOn ? 'ON' : 'OFF'}`;
 }
@@ -1241,6 +1282,7 @@ function onHostData(msg) {
       }
       const changed = !game || game.kifu.length !== msg.game.kifu.length
         || room.seats.join() !== msg.seats.join();
+      if (game && mode === 'online' && msg.game.kifu.length === game.kifu.length + 1) playMoveSound();
       game = msg.game;
       room.seats = msg.seats;
       room.members = msg.members;
@@ -1369,6 +1411,13 @@ $('btn-danmaku').onclick = () => {
   danmakuOn = !danmakuOn;
   localStorage.setItem('shogi-danmaku', danmakuOn ? 'on' : 'off');
   if (!danmakuOn) clearDanmaku();
+  render();
+};
+
+$('btn-sound').onclick = () => {
+  soundOn = !soundOn;
+  localStorage.setItem('shogi-sound', soundOn ? 'on' : 'off');
+  if (soundOn) playMoveSound();
   render();
 };
 

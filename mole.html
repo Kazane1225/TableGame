@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>モグラたたき 1v1</title>
+  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="mole.css?v=1">
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+  <header><h1>🔨 モグラたたき 1v1</h1></header>
+
+  <section id="lobby">
+    <div class="card">
+      <label class="field">あなたの名前
+        <input id="player-name" maxlength="16" autocomplete="off">
+      </label>
+    </div>
+
+    <p id="lobby-msg" class="notice" hidden></p>
+
+    <div class="card highlight" id="card-invited" hidden>
+      <h2>部屋に招待されています</h2>
+      <p>部屋コード: <b id="invited-code"></b></p>
+      <button id="btn-accept" class="primary big">この部屋に参加する</button>
+      <p class="muted small"><a href="mole.html">招待を使わずにトップ画面へ</a></p>
+    </div>
+
+    <div id="lobby-normal">
+      <div class="card">
+        <h2>遊び方</h2>
+        <p class="muted">モグラ側と叩く側に分かれて対戦します。1ラウンド30秒で、2ラウンド目は役割が入れ替わります。</p>
+        <ul class="muted rules">
+          <li><b>モグラ側</b>: 穴をタップすると、盤が少し揺れてからモグラが顔を出します（叩く側にはどの穴か分かりません）。叩かれずに引っ込めば +1点。<b>フェイント</b>を使うと揺れるだけでモグラは出ません。直前に出した穴は続けて使えません。</li>
+          <li><b>叩く側</b>: 顔を出したモグラの穴をタップして叩くと +1点。空振りすると少しの間ハンマーが使えません。揺れている間に当たりの穴を叩いてしまうと、モグラ側に +1点。</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>友人を招待して遊ぶ</h2>
+        <p class="muted">部屋を作ると招待リンクが発行されます。それを友人に送ってください。</p>
+        <button id="btn-host" class="primary big">部屋を作る</button>
+      </div>
+
+      <div class="card">
+        <h2>招待された部屋に入る</h2>
+        <div class="row">
+          <input id="join-code" placeholder="招待リンク または 部屋コード" autocomplete="off">
+          <button id="btn-join">参加</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>CPUと遊ぶ</h2>
+        <p class="muted">1人で練習できます。通信はしません。</p>
+        <button id="btn-cpu">はじめる</button>
+      </div>
+
+      <p class="muted small"><a href="index.html">← 将棋に戻る</a></p>
+    </div>
+  </section>
+
+  <section id="mgame" hidden>
+    <div id="m-invite" class="invite-banner" hidden>
+      <p><b>対戦相手を待っています。</b>このリンクを友人に送ってください。</p>
+      <div class="row">
+        <input id="invite-url" readonly>
+        <button id="btn-invite-copy" class="primary">コピー</button>
+      </div>
+    </div>
+
+    <div class="m-score">
+      <div class="m-player" id="m-p0"><span class="m-name"></span><b>0</b></div>
+      <div class="m-timer" id="m-timer">--</div>
+      <div class="m-player" id="m-p1"><span class="m-name"></span><b>0</b></div>
+    </div>
+
+    <div id="m-status"></div>
+    <div id="m-board" class="m-board"></div>
+
+    <div class="row m-controls">
+      <button id="btn-fake">フェイント: OFF</button>
+      <button id="btn-rematch" hidden>再戦</button>
+      <button id="btn-sound">音: ON</button>
+      <button id="btn-lobby">ロビーへ</button>
+    </div>
+  </section>
+
+  <script src="mole.js?v=1"></script>
+</body>
+</html>
