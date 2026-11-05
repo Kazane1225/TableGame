@@ -533,6 +533,23 @@ function onGuestData(msg, fail) {
 
 const role = () => (view.snap && view.snap.moleSeat === view.seat ? 'mole' : 'hammer');
 
+const ICON_SRC = {
+  mole: 'assets/mole.svg',
+  hammer: 'assets/hammer.svg',
+  hit: 'assets/fx-hit.svg',
+  miss: 'assets/fx-miss.svg',
+  escape: 'assets/fx-escape.svg',
+};
+
+function iconEl(name, cls = 'ico') {
+  const img = new Image();
+  img.src = ICON_SRC[name];
+  img.alt = '';
+  img.className = cls;
+  img.draggable = false;
+  return img;
+}
+
 function buildBoard() {
   const board = $('m-board');
   if (board.children.length) return;
@@ -540,15 +557,17 @@ function buildBoard() {
     const h = document.createElement('div');
     h.className = 'hole';
     h.dataset.i = i;
-    h.innerHTML = '<span class="mole">🐹</span><span class="fx"></span>';
+    const fx = document.createElement('span');
+    fx.className = 'fx';
+    h.append(iconEl('mole', 'mole'), fx);
     board.appendChild(h);
   }
 }
 
-function showFx(hole, text) {
+function showFx(hole, name) {
   const fx = $('m-board').children[hole]?.querySelector('.fx');
   if (!fx) return;
-  fx.textContent = text;
+  fx.replaceChildren(iconEl(name, 'fx-img'));
   fx.classList.remove('show');
   void fx.offsetWidth;
   fx.classList.add('show');
@@ -565,8 +584,7 @@ function onSnap(s) {
   }
   if (s.fx && s.fx.id !== view.lastFx) {
     view.lastFx = s.fx.id;
-    const icon = { hit: '💥', miss: '💨', escape: '✨' }[s.fx.type];
-    showFx(s.fx.hole, icon);
+    showFx(s.fx.hole, s.fx.type);
     sfx(s.fx.type);
   }
   if (prev && prev.phase !== 'over' && s.phase === 'over') sfx('end');
@@ -585,8 +603,10 @@ function render() {
 
   for (let i = 0; i < 2; i++) {
     const el = $('m-p' + i);
-    const roleIcon = s.phase === 'waiting' ? '' : (s.moleSeat === i ? '🐹 ' : '🔨 ');
-    el.querySelector('.m-name').textContent = roleIcon + (s.names[i] || '（待機中）');
+    const name = el.querySelector('.m-name');
+    name.replaceChildren();
+    if (s.phase !== 'waiting') name.append(iconEl(s.moleSeat === i ? 'mole' : 'hammer'));
+    name.append(s.names[i] || '（待機中）');
     el.querySelector('b').textContent = s.scores[i];
     el.classList.toggle('me', i === me);
   }
@@ -624,31 +644,38 @@ function renderStatus() {
   }
   const me = view.seat;
   const isMole = role() === 'mole';
-  const roleText = isMole ? '🐹 モグラ側' : '🔨 叩く側';
+  const roleSpan = () => {
+    const r = document.createElement('span');
+    r.className = 'role';
+    r.append(iconEl(isMole ? 'mole' : 'hammer'), isMole ? 'モグラ側' : '叩く側');
+    return r;
+  };
   const hint = isMole
     ? '穴をタップして顔を出そう。叩かれる前に引っ込めば得点！'
     : '盤が揺れたらモグラが出る合図。出たらすぐ叩こう！お手付きは相手に +0.5点';
-  let big = '';
+  const parts = [];
   let small = '';
+  let result = '';
 
   if (s.phase === 'waiting') {
-    big = '対戦相手を待っています…';
+    parts.push('対戦相手を待っています…');
   } else if (s.phase === 'countdown') {
-    big = `ラウンド ${s.round}/${s.rounds} — あなたは${roleText}`;
+    parts.push(`ラウンド ${s.round}/${s.rounds} — あなたは`, roleSpan());
     small = hint;
   } else if (s.phase === 'playing') {
-    big = `ラウンド ${s.round}/${s.rounds} — ${roleText}`;
+    parts.push(`ラウンド ${s.round}/${s.rounds} — `, roleSpan());
     small = hint;
   } else {
     const a = s.scores[me];
     const b = s.scores[1 - me];
-    big = a > b ? 'あなたの勝ち！ 🎉' : a < b ? 'あなたの負け…' : '引き分け';
+    parts.push(a > b ? 'あなたの勝ち！' : a < b ? 'あなたの負け…' : '引き分け');
+    result = a > b ? 'win' : '';
     small = `${a} 対 ${b}`;
   }
   el.innerHTML = '';
   const b = document.createElement('span');
-  b.className = 'big';
-  b.textContent = big;
+  b.className = 'big' + (result ? ' ' + result : '');
+  b.append(...parts);
   el.append(b, small);
 }
 
@@ -684,7 +711,7 @@ $('m-board').addEventListener('pointerdown', e => {
     }
   } else {
     if (s.lockMs - (performance.now() - view.t0) > 0) return;
-    showFx(hole, '🔨');
+    showFx(hole, 'hammer');
     sendInput({ type: 'whack', hole });
   }
 });

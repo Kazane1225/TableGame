@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>将棋 1v1（観戦可）</title>
+  <link rel="icon" href="assets/logo-dice.svg">
+  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="theme.css?v=2">
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+  <header class="topbar"><a class="home" href="index.html"><img class="ico" src="assets/logo-dice.svg" alt="">テーブルゲーム</a><h1>将棋 1v1</h1></header>
+
+  <section id="lobby">
+    <div class="card">
+      <label class="field">あなたの名前（オンライン対戦で表示されます）
+        <input id="player-name" maxlength="16" autocomplete="off">
+      </label>
+    </div>
+
+    <p id="lobby-msg" class="notice" hidden></p>
+
+    <div class="card highlight" id="card-invited" hidden>
+      <h2>部屋に招待されています</h2>
+      <p>部屋コード: <b id="invited-code"></b></p>
+      <button id="btn-accept" class="primary big">この部屋に参加する</button>
+      <p class="muted small"><a href="#" id="link-top">招待を使わずにトップ画面へ</a></p>
+    </div>
+
+    <div id="lobby-normal">
+      <div class="card">
+        <h2>友人を招待して遊ぶ</h2>
+        <p class="muted">部屋を作ると招待リンクが発行されるので、それを友人に送るだけです。あなたが部屋コードを入力する必要はありません。</p>
+        <label class="field">あなたの席
+          <select id="side-pref">
+            <option value="sente">先手</option>
+            <option value="gote">後手</option>
+            <option value="random">ランダム</option>
+            <option value="watch">観戦（対局は他の人に任せる）</option>
+          </select>
+        </label>
+        <button id="btn-host" class="primary big">部屋を作る</button>
+      </div>
+
+      <div class="card">
+        <h2>招待された部屋に入る</h2>
+        <p class="muted">友人から届いた招待リンクを開けば、そのまま参加できます。リンクか部屋コードを貼り付けて参加することもできます。</p>
+        <div class="row">
+          <input id="join-code" placeholder="招待リンク または 部屋コード" autocomplete="off">
+          <button id="btn-join">参加</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>1台で遊ぶ</h2>
+        <p class="muted">同じ端末を交代で操作して対局します。通信はしません。</p>
+        <button id="btn-local">はじめる</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="game" hidden>
+    <div id="status"></div>
+    <div id="invite-banner" class="invite-banner" hidden>
+      <p><b>対局相手を待っています。</b>このリンクを友人に送ってください。</p>
+      <div class="row">
+        <input id="invite-url" readonly>
+        <button id="btn-invite-copy" class="primary">コピー</button>
+        <button id="btn-invite-share" hidden>共有</button>
+      </div>
+    </div>
+    <div class="layout">
+      <div class="play">
+        <div class="hand" id="hand-top"></div>
+        <div class="board-wrap">
+          <div class="files" id="files"></div>
+          <div class="board-row">
+            <div class="board" id="board"></div>
+            <div class="ranks" id="ranks"></div>
+          </div>
+        </div>
+        <div class="hand" id="hand-bottom"></div>
+        <div id="danmaku" aria-hidden="true"></div>
+      </div>
+      <div class="side">
+        <div class="controls">
+          <button id="btn-undo">待った</button>
+          <button id="btn-flip">盤を反転</button>
+          <button id="btn-resign">投了</button>
+          <button id="btn-rematch" hidden>再戦</button>
+          <button id="btn-sound">駒音: ON</button>
+          <button id="btn-danmaku" hidden>コメントを流す: ON</button>
+          <button id="btn-lobby">ロビーへ</button>
+        </div>
+        <div id="room" hidden>
+          <h3>部屋</h3>
+          <div class="row">
+            <span class="muted">コード: <b id="room-code"></b></span>
+            <button id="btn-copy">招待リンクをコピー</button>
+          </div>
+          <div class="seat" id="seat-0"></div>
+          <div class="seat" id="seat-1"></div>
+          <p class="muted" id="spectators"></p>
+        </div>
+        <div id="chat" hidden>
+          <h3>チャット</h3>
+          <div id="chat-log"></div>
+          <form id="chat-form" class="row">
+            <input id="chat-input" maxlength="200" placeholder="メッセージ" autocomplete="off">
+            <button type="submit">送信</button>
+          </form>
+        </div>
+        <h3>棋譜</h3>
+        <ol id="kifu"></ol>
+      </div>
+    </div>
+  </section>
+
+  <div id="promo" class="modal" hidden>
+    <div class="modal-box">
+      <p>成りますか？</p>
+      <div class="row">
+        <button id="promo-yes">成る</button>
+        <button id="promo-no">成らない</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="main.js?v=9"></script>
+</body>
+</html>
