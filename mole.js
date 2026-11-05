@@ -8,11 +8,12 @@ const C = {
   ROUND_MS: 30000,
   COUNTDOWN_MS: 3000,
   RUMBLE_MS: 300,   // モグラが出る前の予兆（叩く側には場所が分からない）
-  UP_MIN_MS: 150,   // モグラが顔を出している時間（毎回この範囲でランダム）
+  UP_MIN_MS: 200,   // モグラが顔を出している時間（毎回この範囲でランダム）
   UP_MAX_MS: 450,
   COOL_MS: 350,     // モグラ側が次に動けるまで
   STUN_MS: 300,     // 叩かれたあとの追加の待ち
-  MISS_LOCK_MS: 800, // 空振りしたハンマーが使えない時間
+  MISS_LOCK_MS: 800, // お手付きしたハンマーが使えない時間
+  MISS_BONUS: 0.5,  // お手付き1回につきモグラ側に入る点
 };
 
 function createEngine(onChange) {
@@ -26,7 +27,7 @@ function createEngine(onChange) {
     seated: [false, false],
     cpu: false,
     rematch: [false, false],
-    mole: null,       // { hole, stage: 'rumble'|'up', end, fake, bait }
+    mole: null,       // { hole, stage: 'rumble'|'up', end, fake }
     lastHole: -1,
     fxId: 0,
     fx: null,
@@ -94,7 +95,7 @@ function createEngine(onChange) {
     if (msg.type === 'pop') {
       if (!playing || s !== g.moleSeat || g.mole || t < g.moleReadyAt) return;
       if (!validHole || hole === g.lastHole) return;
-      g.mole = { hole, stage: 'rumble', end: t + C.RUMBLE_MS, fake: !!msg.fake, bait: false };
+      g.mole = { hole, stage: 'rumble', end: t + C.RUMBLE_MS, fake: !!msg.fake };
       emit();
     } else if (msg.type === 'whack') {
       if (!playing || s === g.moleSeat || t < g.lockUntil || !validHole) return;
@@ -105,13 +106,8 @@ function createEngine(onChange) {
         endMole(t, C.STUN_MS);
       } else {
         g.lockUntil = t + C.MISS_LOCK_MS;
-        if (m && m.stage === 'rumble' && m.hole === hole && !m.bait) {
-          m.bait = true;
-          g.scores[g.moleSeat]++;
-          addFx('bait', hole);
-        } else {
-          addFx('miss', hole);
-        }
+        g.scores[g.moleSeat] += C.MISS_BONUS;
+        addFx('miss', hole);
       }
       emit();
     } else if (msg.type === 'rematch') {
@@ -569,9 +565,9 @@ function onSnap(s) {
   }
   if (s.fx && s.fx.id !== view.lastFx) {
     view.lastFx = s.fx.id;
-    const icon = { hit: '💥', miss: '💨', bait: '😜', escape: '✨' }[s.fx.type];
+    const icon = { hit: '💥', miss: '💨', escape: '✨' }[s.fx.type];
     showFx(s.fx.hole, icon);
-    sfx(s.fx.type === 'bait' ? 'escape' : s.fx.type);
+    sfx(s.fx.type);
   }
   if (prev && prev.phase !== 'over' && s.phase === 'over') sfx('end');
   if (prev && prev.phase === 'countdown' && s.phase === 'playing') sfx('go');
@@ -631,7 +627,7 @@ function renderStatus() {
   const roleText = isMole ? '🐹 モグラ側' : '🔨 叩く側';
   const hint = isMole
     ? '穴をタップして顔を出そう。叩かれる前に引っ込めば得点！'
-    : '盤が揺れたらモグラが出る合図。どの穴かは分かりません。出たらすぐ叩こう！';
+    : '盤が揺れたらモグラが出る合図。出たらすぐ叩こう！お手付きは相手に +0.5点';
   let big = '';
   let small = '';
 
